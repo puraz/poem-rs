@@ -17,6 +17,13 @@ export struct RecommendationRow {
     reason: string,
 }
 
+component TintedIcon inherits Image {
+    in property <brush> tint: #5D5348;
+
+    colorize: root.tint;
+    image-fit: contain;
+}
+
 component SidebarPrimaryAction inherits Rectangle {
     in property <string> text;
     callback clicked();
@@ -28,20 +35,18 @@ component SidebarPrimaryAction inherits Rectangle {
     border-width: 1px;
     clip: true;
 
-    Text {
-        text: "✦";
-        x: 18px;
-        y: 0;
-        height: parent.height;
-        vertical-alignment: center;
-        color: touch.pressed ? #7A591F : #8B6B3F;
-        font-size: 20px;
-        font-weight: 700;
+    TintedIcon {
+        x: 16px;
+        y: 16px;
+        width: 22px;
+        height: 22px;
+        source: @image-url("../assets/icons/discover.svg");
+        tint: touch.pressed ? #7A591F : #8B6B3F;
     }
 
     Text {
         text: parent.text;
-        x: 48px;
+        x: 52px;
         y: 0;
         height: parent.height;
         vertical-alignment: center;
@@ -56,7 +61,7 @@ component SidebarPrimaryAction inherits Rectangle {
 }
 
 component SidebarNavItem inherits Rectangle {
-    in property <string> icon;
+    in property <image> icon;
     in property <string> text;
     in property <bool> active;
     in property <string> caption;
@@ -69,21 +74,18 @@ component SidebarNavItem inherits Rectangle {
     border-width: 1px;
     clip: true;
 
-    Text {
-        text: parent.icon;
-        x: 18px;
-        y: 0;
-        height: parent.height;
-        vertical-alignment: center;
-        color: root.active ? #8B6B3F : (touch.has-hover ? #5D5348 : #6C6257);
-        opacity: 1;
-        font-size: 18px;
-        font-weight: 700;
+    TintedIcon {
+        x: 16px;
+        y: 18px;
+        width: 20px;
+        height: 20px;
+        source: parent.icon;
+        tint: root.active ? #8B6B3F : (touch.has-hover ? #5D5348 : #6C6257);
     }
 
     Text {
         text: parent.text;
-        x: 48px;
+        x: 52px;
         y: 10px;
         color: root.active ? #1F1B16 : (touch.has-hover ? #1F1B16 : #2B241F);
         font-size: 16px;
@@ -93,7 +95,7 @@ component SidebarNavItem inherits Rectangle {
 
     Text {
         text: parent.caption;
-        x: 48px;
+        x: 52px;
         y: 30px;
         color: #8B8074;
         font-size: 11px;
@@ -136,7 +138,8 @@ component FilterChip inherits Rectangle {
 }
 
 component CardIconAction inherits Rectangle {
-    in property <string> label;
+    in property <image> icon;
+    in property <brush> icon-color: touch.has-hover ? #3A342E : #5D5348;
     callback clicked();
 
     width: 38px;
@@ -146,15 +149,13 @@ component CardIconAction inherits Rectangle {
     border-color: touch.pressed ? #B78A3D : (touch.has-hover ? #C9B292 : #DDD4C8);
     border-width: 1px;
 
-    Text {
-        text: parent.label;
-        width: parent.width;
-        height: parent.height;
-        horizontal-alignment: center;
-        vertical-alignment: center;
-        color: touch.has-hover ? #3A342E : #5D5348;
-        font-size: 16px;
-        font-weight: 700;
+    TintedIcon {
+        x: 10px;
+        y: 10px;
+        width: 18px;
+        height: 18px;
+        source: root.icon;
+        tint: root.icon-color;
     }
 
     touch := TouchArea {
@@ -173,20 +174,19 @@ component SearchField inherits Rectangle {
     border-color: editor.has-focus ? #B78A3D : #DDD4C8;
     border-width: editor.has-focus ? 2px : 1px;
 
-    Text {
-        text: "⌕";
+    TintedIcon {
         x: 18px;
-        y: 0;
-        height: parent.height;
-        vertical-alignment: center;
-        color: #8B8074;
-        font-size: 20px;
+        y: 18px;
+        width: 20px;
+        height: 20px;
+        source: @image-url("../assets/icons/search.svg");
+        tint: editor.has-focus ? #8B6B3F : #8B8074;
     }
 
     editor := TextInput {
-        x: 48px;
+        x: 52px;
         y: 12px;
-        width: parent.width - 66px;
+        width: parent.width - 72px;
         height: parent.height - 24px;
         text <=> root.text;
         color: #2B241F;
@@ -197,9 +197,9 @@ component SearchField inherits Rectangle {
     }
 
     if editor.text == "" : Text {
-        x: 48px;
+        x: 52px;
         y: 0;
-        width: parent.width - 66px;
+        width: parent.width - 72px;
         height: parent.height;
         text: root.placeholder-text;
         color: #8B8074;
@@ -297,15 +297,13 @@ component ToggleRow inherits Rectangle {
         border-color: root.checked ? #78AEE8 : #CFC4B8;
         border-width: 1px;
 
-        if root.checked : Text {
-            text: "✓";
-            width: parent.width;
-            height: parent.height;
-            horizontal-alignment: center;
-            vertical-alignment: center;
-            color: #1F1B16;
-            font-size: 15px;
-            font-weight: 700;
+        if root.checked : TintedIcon {
+            x: 5px;
+            y: 5px;
+            width: 14px;
+            height: 14px;
+            source: @image-url("../assets/icons/check.svg");
+            tint: #1F1B16;
         }
     }
 
@@ -368,12 +366,13 @@ component PoemListCard inherits Rectangle {
         font-size: 13px;
     }
 
-    Text {
-        text: parent.favorite ? "♥" : "♡";
-        x: parent.width - 34px;
+    TintedIcon {
+        x: parent.width - 38px;
         y: 18px;
-        color: parent.favorite ? #B45309 : #B8ADA0;
-        font-size: 18px;
+        width: 18px;
+        height: 18px;
+        source: parent.favorite ? @image-url("../assets/icons/favorite-filled.svg") : @image-url("../assets/icons/favorite-outline.svg");
+        tint: parent.favorite ? #B45309 : #B8ADA0;
     }
 
     touch := TouchArea {
@@ -465,7 +464,7 @@ export component AppWindow inherits Window {
             x: 16px;
             y: 92px;
             width: parent.width - 32px;
-            icon: "⌂";
+            icon: @image-url("../assets/icons/home.svg");
             text: "首页";
             caption: "浏览当前诗库";
             active: root.sidebar_view == "home";
@@ -480,7 +479,7 @@ export component AppWindow inherits Window {
             x: 16px;
             y: 156px;
             width: parent.width - 32px;
-            icon: "♥";
+            icon: @image-url("../assets/icons/favorite-filled.svg");
             text: "收藏夹";
             caption: "查看已收藏诗词";
             active: root.sidebar_view == "favorites";
@@ -495,7 +494,7 @@ export component AppWindow inherits Window {
             x: 16px;
             y: 220px;
             width: parent.width - 32px;
-            icon: "i";
+            icon: @image-url("../assets/icons/about.svg");
             text: "关于";
             caption: "查看应用说明";
             active: root.sidebar_view == "about";
@@ -517,7 +516,7 @@ export component AppWindow inherits Window {
             x: 16px;
             y: parent.height - 122px;
             width: parent.width - 32px;
-            icon: "◐";
+            icon: @image-url("../assets/icons/theme.svg");
             text: "主题设置";
             caption: "纸感 / 现代排版";
             active: root.inspector_view == "theme";
@@ -530,7 +529,7 @@ export component AppWindow inherits Window {
             x: 16px;
             y: parent.height - 58px;
             width: parent.width - 32px;
-            icon: "⚙";
+            icon: @image-url("../assets/icons/settings.svg");
             text: "AI 设置";
             caption: root.ai_model;
             active: root.inspector_view == "settings";
@@ -697,12 +696,13 @@ export component AppWindow inherits Window {
                 height: 980px;
                 background: transparent;
 
-                Text {
+                TintedIcon {
                     x: 20px;
-                    y: 22px;
-                    text: "▣";
-                    color: #8B8074;
-                    font-size: 18px;
+                    y: 20px;
+                    width: 22px;
+                    height: 22px;
+                    source: @image-url("../assets/icons/poem-detail.svg");
+                    tint: #8B8074;
                 }
 
                 Text {
@@ -718,14 +718,16 @@ export component AppWindow inherits Window {
                 favAction := CardIconAction {
                     x: parent.width - 54px;
                     y: 14px;
-                    label: root.selected_favorite ? "♥" : "♡";
+                    icon: root.selected_favorite ? @image-url("../assets/icons/favorite-filled.svg") : @image-url("../assets/icons/favorite-outline.svg");
+                    icon-color: root.selected_favorite ? #B45309 : #8B8074;
                     clicked => { root.toggle_favorite(root.selected_poem_id); }
                 }
 
                 aiAction := CardIconAction {
                     x: parent.width - 98px;
                     y: 14px;
-                    label: root.ai_busy ? "…" : "AI";
+                    icon: @image-url("../assets/icons/ai.svg");
+                    icon-color: root.ai_busy ? #A29588 : #8B6B3F;
                     clicked => {
                         if (!root.ai_busy) {
                             root.request_appreciation(root.selected_poem_id);
