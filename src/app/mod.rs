@@ -2,8 +2,10 @@ mod stderr_filter;
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use anyhow::Result;
+use slint::winit_030::{EventResult, WinitWindowAccessor, winit};
 use slint::{ComponentHandle, ModelRc, SharedString, VecModel};
 use tracing_subscriber::EnvFilter;
 
@@ -20,7 +22,7 @@ use crate::services::local::{curated_recommendations, discover_locally};
 use crate::services::normalization::{
     RecommendationResolution, resolve_recommendations, validate_appreciation,
 };
-use crate::storage::{AppDatabase, StoredAiConfig};
+use crate::storage::{AppDatabase, StoredAiConfig, WindowGeometry};
 use crate::{AppWindow, PoemRow, RecommendationRow};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -68,14 +70,135 @@ pub fn run() -> Result<()> {
     let db = AppDatabase::new(paths.db_path());
     db.bootstrap()?;
     let ai_config = db.load_ai_config()?;
+    let saved_window_geometry = db.load_window_geometry()?;
 
     let controller = Arc::new(Mutex::new(AppController::new(db, paths, ai_config)?));
     let app = AppWindow::new()?;
 
     bind_callbacks(&app, controller.clone());
+    install_window_geometry_persistence(
+        &app,
+        controller.lock().unwrap().db.clone(),
+        saved_window_geometry,
+    );
     controller.lock().unwrap().render(&app)?;
-    app.run()?;
+    app.show()?;
+    let weak = app.as_weak();
+    slint::Timer::single_shot(Duration::ZERO, move || {
+        if let Some(app) = weak.upgrade() {
+            restore_or_center_window(&app, saved_window_geometry);
+        }
+    });
+    slint::run_event_loop()?;
+    app.hide()?;
     Ok(())
+}
+
+fn install_window_geometry_persistence(
+    app: &AppWindow,
+    db: AppDatabase,
+    saved_geometry: Option<WindowGeometry>,
+) {
+    let latest_geometry = Arc::new(Mutex::new(saved_geometry));
+    let latest_for_events = latest_geometry.clone();
+    app.window().on_winit_window_event(move |window, event| {
+        match event {
+            winit::event::WindowEvent::Moved(position) => {
+                let mut latest = latest_for_events.lock().unwrap();
+                let geometry = latest.get_or_insert_with(WindowGeometry::default);
+                geometry.x = position.x;
+                geometry.y = position.y;
+            }
+            winit::event::WindowEvent::Resized(size) => {
+                let mut latest = latest_for_events.lock().unwrap();
+                let geometry = latest.get_or_insert_with(WindowGeometry::default);
+                geometry.width = size.width;
+                geometry.height = size.height;
+            }
+            winit::event::WindowEvent::CloseRequested => {
+                if let Some(geometry) = latest_for_events.lock().unwrap().as_ref().copied() {
+                    let _ = db.save_window_geometry(geometry);
+                }
+            }
+            _ => {}
+        }
+        let latest_for_sync = latest_for_events.clone();
+        let _ = window.with_winit_window(|winit_window: &winit::window::Window| {
+            if let Some(geometry) = current_window_geometry(winit_window) {
+                *latest_for_sync.lock().unwrap() = Some(geometry);
+            }
+        });
+        EventResult::Propagate
+    });
+}
+
+fn restore_or_center_window(app: &AppWindow, saved_geometry: Option<WindowGeometry>) {
+    let _ = app
+        .window()
+        .with_winit_window(|window: &winit::window::Window| {
+            if let Some(geometry) = saved_geometry.filter(|g| window_geometry_is_visible(window, g))
+            {
+                let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(
+                    geometry.width,
+                    geometry.height,
+                ));
+                window
+                    .set_outer_position(winit::dpi::PhysicalPosition::new(geometry.x, geometry.y));
+            } else {
+                center_winit_window_on_monitor(window);
+            }
+        });
+}
+
+fn center_winit_window_on_monitor(window: &winit::window::Window) {
+    let Some(monitor) = window
+        .current_monitor()
+        .or_else(|| window.available_monitors().next())
+    else {
+        return;
+    };
+
+    let monitor_size = monitor.size();
+    let monitor_origin = monitor.position();
+    let window_size = window.outer_size();
+
+    let x = monitor_origin.x + ((monitor_size.width as i32 - window_size.width as i32) / 2).max(0);
+    let y =
+        monitor_origin.y + ((monitor_size.height as i32 - window_size.height as i32) / 2).max(0);
+
+    window.set_outer_position(winit::dpi::PhysicalPosition::new(x, y));
+}
+
+fn window_geometry_is_visible(window: &winit::window::Window, geometry: &WindowGeometry) -> bool {
+    if geometry.width == 0 || geometry.height == 0 {
+        return false;
+    }
+
+    let right = geometry.x.saturating_add(geometry.width as i32);
+    let bottom = geometry.y.saturating_add(geometry.height as i32);
+
+    window.available_monitors().any(|monitor| {
+        let origin = monitor.position();
+        let size = monitor.size();
+        let monitor_right = origin.x.saturating_add(size.width as i32);
+        let monitor_bottom = origin.y.saturating_add(size.height as i32);
+
+        geometry.x < monitor_right
+            && right > origin.x
+            && geometry.y < monitor_bottom
+            && bottom > origin.y
+    })
+}
+
+fn current_window_geometry(window: &winit::window::Window) -> Option<WindowGeometry> {
+    let position = window.outer_position().ok()?;
+    let size = window.inner_size();
+    Some(WindowGeometry {
+        x: position.x,
+        y: position.y,
+        width: size.width,
+        height: size.height,
+    })
 }
 
 fn bind_callbacks(app: &AppWindow, controller: Arc<Mutex<AppController>>) {
@@ -147,12 +270,11 @@ struct AppController {
     ai_config: StoredAiConfig,
     filter: FilterKind,
     selected_poem_id: Option<String>,
-    banner: String,
     ai_busy: bool,
     discover_query: String,
     recommendations: Vec<AiRecommendation>,
+    analysis_poem_id: Option<String>,
     analysis_text: String,
-    analysis_status: String,
 }
 
 impl AppController {
@@ -165,12 +287,11 @@ impl AppController {
             ai_config,
             filter: FilterKind::Recommended,
             selected_poem_id,
-            banner: "欢迎来到诗词收藏桌面端：先浏览本地诗库，再用 AI 发现意境相近的作品。".into(),
             ai_busy: false,
             discover_query: String::new(),
             recommendations: Vec::new(),
-            analysis_text: "选择一首诗后，可在这里查看缓存赏析或生成新的 AI 赏析。".into(),
-            analysis_status: "离线可浏览/收藏；AI 为增强能力。".into(),
+            analysis_poem_id: None,
+            analysis_text: String::new(),
         })
     }
 
@@ -199,10 +320,11 @@ impl AppController {
         if let Some(poem) = &selected {
             self.selected_poem_id = Some(poem.id.clone());
             if let Some(cached) = self.db.load_cached_analysis(&poem.id)? {
+                self.analysis_poem_id = Some(poem.id.clone());
                 self.analysis_text = cached.display_text();
-                self.analysis_status = "已加载缓存赏析。".into();
-            } else if self.analysis_text.is_empty() {
-                self.analysis_text = "点击“生成 AI 赏析”后，这里会展示结构化解析。".into();
+            } else if self.analysis_poem_id.as_deref() != Some(poem.id.as_str()) {
+                self.analysis_poem_id = None;
+                self.analysis_text.clear();
             }
         }
 
@@ -213,13 +335,11 @@ impl AppController {
                 self.filter.title()
             };
         app.set_section_title(section_title.into());
-        app.set_banner_text(soft_wrap(&self.banner, 28).into());
         app.set_poem_count(format!("共 {} 首 · 收藏 {} 首", poems.len(), favorites).into());
         app.set_ai_busy(self.ai_busy);
         app.set_ai_mode_label(self.current_ai_mode().label().into());
         app.set_discover_query(self.discover_query.clone().into());
         app.set_discover_placeholder(self.discover_placeholder().into());
-        app.set_analysis_status(self.analysis_status.clone().into());
         app.set_analysis_text(soft_wrap(&self.analysis_text, 22).into());
         app.set_ai_base_url(self.ai_config.settings.base_url.clone().into());
         app.set_ai_model(self.ai_config.settings.model.clone().into());
@@ -267,18 +387,13 @@ impl AppController {
 
     fn select_poem(&mut self, poem_id: &str, app: &AppWindow) -> Result<()> {
         self.selected_poem_id = Some(poem_id.to_string());
+        self.analysis_poem_id = None;
         self.analysis_text.clear();
-        self.analysis_status = "已切换诗词。可查看缓存赏析，或重新生成 AI 赏析。".into();
         self.render(app)
     }
 
     fn toggle_favorite(&mut self, poem_id: &str, app: &AppWindow) -> Result<()> {
-        let favored = self.db.toggle_favorite(poem_id)?;
-        self.banner = if favored {
-            "这首诗已加入收藏。".into()
-        } else {
-            "已从收藏中移除。".into()
-        };
+        self.db.toggle_favorite(poem_id)?;
         self.render(app)
     }
 
@@ -308,9 +423,6 @@ impl AppController {
 
         if !api_key.trim().is_empty() {
             self.store_secret(api_key.trim())?;
-            self.banner = "AI 设置已保存。现在可以尝试智能发现或 AI 赏析。".into();
-        } else {
-            self.banner = "已保存 AI 基础设置；如需联网能力，请输入 API Key。".into();
         }
         self.render(app)
     }
@@ -320,7 +432,6 @@ impl AppController {
         let file_store = FileSecretStore::new(self.paths.config_dir());
         let _ = keyring.clear();
         let _ = file_store.clear();
-        self.banner = "已清除 AI Key，应用回到本地浏览/收藏模式。".into();
         self.render(app)
     }
 
@@ -456,23 +567,17 @@ impl AppController {
         {
             let mut ctrl = controller.lock().unwrap();
             ctrl.ai_busy = true;
-            ctrl.banner = "正在生成推荐…".into();
             ctrl.discover_query = query.clone();
             if let Some(window) = weak.upgrade() {
                 let _ = ctrl.render(&window);
             }
         }
 
-        let (db, settings, poems, secret) = {
+        let (settings, poems, secret) = {
             let ctrl = controller.lock().unwrap();
             let poems = ctrl.db.list_poems().unwrap_or_default();
             let (secret, _) = ctrl.current_secret();
-            (
-                ctrl.db.clone(),
-                ctrl.ai_config.settings.clone(),
-                poems,
-                secret,
-            )
+            (ctrl.ai_config.settings.clone(), poems, secret)
         };
 
         std::thread::spawn(move || {
@@ -510,14 +615,9 @@ impl AppController {
                     let mut ctrl = controller.lock().unwrap();
                     ctrl.ai_busy = false;
                     ctrl.recommendations = resolution.recommendations.clone();
-                    ctrl.banner = resolution
-                        .warning_banner()
-                        .unwrap_or("已根据你的描述生成推荐结果。")
-                        .to_string();
                     if let Some(first) = ctrl.recommendations.first() {
                         ctrl.selected_poem_id = Some(first.poem_id.clone());
                     }
-                    let _ = db.path();
                     let _ = ctrl.render(&window);
                 }
             });
@@ -532,7 +632,6 @@ impl AppController {
         {
             let mut ctrl = controller.lock().unwrap();
             ctrl.ai_busy = true;
-            ctrl.analysis_status = "正在生成 AI 赏析…".into();
             if let Some(window) = weak.upgrade() {
                 let _ = ctrl.render(&window);
             }
@@ -586,21 +685,15 @@ impl AppController {
                     ctrl.ai_busy = false;
                     match result {
                         Ok(appreciation) => {
+                            ctrl.analysis_poem_id = Some(poem_id.clone());
                             ctrl.analysis_text = appreciation.display_text();
-                            ctrl.analysis_status = "AI 赏析已生成并缓存。".into();
-                            ctrl.banner = "已生成当前诗词的 AI 赏析。".into();
                             let _ = ctrl.db.save_cached_analysis(
                                 &poem_id,
                                 &appreciation,
                                 &settings.model,
                             );
                         }
-                        Err(message) => {
-                            ctrl.analysis_text =
-                                "当前未生成新的赏析，可继续浏览本地诗词或稍后重试。".into();
-                            ctrl.analysis_status = message.clone();
-                            ctrl.banner = message;
-                        }
+                        Err(_) => {}
                     }
                     let _ = ctrl.render(&window);
                 }

@@ -114,7 +114,10 @@ impl AiAppreciation {
     }
 
     pub fn display_text(&self) -> String {
-        let mut parts = vec![format!("摘要：{}", self.summary)];
+        let mut parts = Vec::new();
+        if !self.summary.is_empty() {
+            parts.push(self.summary.clone());
+        }
         if !self.themes.is_empty() {
             parts.push(format!("主题：{}", self.themes.join("、")));
         }

@@ -4,7 +4,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use rusqlite::{Connection, OptionalExtension, params};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::config::ai::AiSettings;
@@ -22,6 +22,14 @@ pub struct AppDatabase {
 pub struct StoredAiConfig {
     pub settings: AiSettings,
     pub allow_file_fallback: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WindowGeometry {
+    pub x: i32,
+    pub y: i32,
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Clone, Debug)]
@@ -154,6 +162,19 @@ impl AppDatabase {
         Ok(())
     }
 
+    pub fn load_window_geometry(&self) -> Result<Option<WindowGeometry>> {
+        let conn = self.connect()?;
+        Ok(self
+            .get_meta(&conn, "window.geometry")?
+            .and_then(|value| serde_json::from_str::<WindowGeometry>(&value).ok()))
+    }
+
+    pub fn save_window_geometry(&self, geometry: WindowGeometry) -> Result<()> {
+        let conn = self.connect()?;
+        self.set_meta(&conn, "window.geometry", &serde_json::to_string(&geometry)?)?;
+        Ok(())
+    }
+
     pub fn load_cached_analysis(&self, poem_id: &str) -> Result<Option<AiAppreciation>> {
         let conn = self.connect()?;
         let mut stmt = conn
@@ -161,8 +182,7 @@ impl AppDatabase {
         let text = stmt
             .query_row([poem_id], |row| row.get::<_, String>(0))
             .optional()?;
-        Ok(text
-            .map(|notes| AiAppreciation::new(poem_id, "已缓存赏析", Vec::new(), Vec::new(), notes)))
+        Ok(text.map(|notes| AiAppreciation::new(poem_id, "", Vec::new(), Vec::new(), notes)))
     }
 
     pub fn save_cached_analysis(
@@ -422,6 +442,26 @@ mod tests {
         assert!(db.toggle_favorite(&poem_id).expect("favorite on"));
         assert!(!db.list_favorites().expect("favorites").is_empty());
         assert!(!db.toggle_favorite(&poem_id).expect("favorite off"));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn window_geometry_persists() {
+        let path = temp_db_path("window-geometry");
+        let db = AppDatabase::new(&path);
+        db.bootstrap().expect("bootstrap");
+        let geometry = WindowGeometry {
+            x: 120,
+            y: 80,
+            width: 1280,
+            height: 840,
+        };
+        db.save_window_geometry(geometry)
+            .expect("save window geometry");
+        assert_eq!(
+            db.load_window_geometry().expect("load window geometry"),
+            Some(geometry)
+        );
         let _ = std::fs::remove_file(path);
     }
 }

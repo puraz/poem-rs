@@ -416,7 +416,6 @@ export component AppWindow inherits Window {
     in-out property <[RecommendationRow]> recommendation_rows;
     in-out property <string> section_title;
     in-out property <string> poem_count;
-    in-out property <string> banner_text;
     in-out property <string> selected_poem_id;
     in-out property <string> selected_title;
     in-out property <string> selected_meta;
@@ -425,7 +424,6 @@ export component AppWindow inherits Window {
     in-out property <string> selected_source;
     in-out property <bool> selected_favorite;
     in-out property <string> analysis_text;
-    in-out property <string> analysis_status;
     in-out property <string> ai_mode_label;
     in-out property <bool> ai_busy;
     in-out property <string> discover_query;
@@ -515,7 +513,7 @@ export component AppWindow inherits Window {
 
         Rectangle {
             x: 16px;
-            y: parent.height - 138px;
+            y: parent.height - 152px;
             width: parent.width - 32px;
             height: 1px;
             background: #E8DED1;
@@ -523,7 +521,7 @@ export component AppWindow inherits Window {
 
         themeNav := SidebarNavItem {
             x: 16px;
-            y: parent.height - 122px;
+            y: parent.height - 136px;
             width: parent.width - 32px;
             icon: @image-url("../assets/icons/theme.svg");
             text: "主题设置";
@@ -536,7 +534,7 @@ export component AppWindow inherits Window {
 
         settingsNav := SidebarNavItem {
             x: 16px;
-            y: parent.height - 58px;
+            y: parent.height - 72px;
             width: parent.width - 32px;
             icon: @image-url("../assets/icons/settings.svg");
             text: "AI 设置";
@@ -574,18 +572,9 @@ export component AppWindow inherits Window {
             font-weight: 700;
         }
 
-        Text {
-            x: 0;
-            y: 108px;
-            width: parent.width;
-            text: root.banner_text;
-            color: #6C6257;
-            font-size: 13px;
-        }
-
         allChip := FilterChip {
             x: 0;
-            y: 146px;
+            y: 118px;
             width: 86px;
             text: "全部";
             active: root.section_title == "首页" || root.section_title == "推荐诗库" || root.section_title == "发现结果";
@@ -598,7 +587,7 @@ export component AppWindow inherits Window {
 
         tangChip := FilterChip {
             x: 98px;
-            y: 146px;
+            y: 118px;
             width: 96px;
             text: "唐诗精选";
             active: root.section_title == "唐诗精选";
@@ -611,7 +600,7 @@ export component AppWindow inherits Window {
 
         songChip := FilterChip {
             x: 206px;
-            y: 146px;
+            y: 118px;
             width: 96px;
             text: "宋词清单";
             active: root.section_title == "宋词清单";
@@ -624,7 +613,7 @@ export component AppWindow inherits Window {
 
         randomChip := FilterChip {
             x: 314px;
-            y: 146px;
+            y: 118px;
             width: 96px;
             text: "随机精选";
             active: root.section_title == "随机精选";
@@ -637,7 +626,7 @@ export component AppWindow inherits Window {
 
         Text {
             x: parent.width - 170px;
-            y: 154px;
+            y: 126px;
             width: 170px;
             horizontal-alignment: right;
             text: root.poem_count;
@@ -647,9 +636,9 @@ export component AppWindow inherits Window {
 
         Rectangle {
             x: 0;
-            y: 196px;
+            y: 168px;
             width: parent.width;
-            height: parent.height - 196px;
+            height: parent.height - 168px;
             border-radius: 22px;
             background: #FBF8F2;
             border-color: #DDD4C8;
@@ -792,34 +781,30 @@ export component AppWindow inherits Window {
                     vertical-stretch: 0;
                 }
 
-                Text {
-                    text: "AI 赏析";
-                    color: #1F1B16;
-                    font-size: 16px;
-                    font-weight: 700;
-                    vertical-stretch: 0;
-                }
+                if !root.analysis_text.is-empty : VerticalBox {
+                    spacing: 18px;
 
-                Text {
-                    text: root.analysis_status;
-                    color: #8B6B3F;
-                    font-size: 12px;
-                    wrap: word-wrap;
-                    vertical-stretch: 0;
-                }
+                    Text {
+                        text: "赏析";
+                        color: #1F1B16;
+                        font-size: 16px;
+                        font-weight: 700;
+                        vertical-stretch: 0;
+                    }
 
-                Text {
-                    text: root.analysis_text;
-                    color: #3A342E;
-                    font-size: 13px;
-                    wrap: word-wrap;
-                    vertical-stretch: 0;
-                }
+                    Text {
+                        text: root.analysis_text;
+                        color: #3A342E;
+                        font-size: 13px;
+                        wrap: word-wrap;
+                        vertical-stretch: 0;
+                    }
 
-                Rectangle {
-                    height: 1px;
-                    background: #E8DED1;
-                    vertical-stretch: 0;
+                    Rectangle {
+                        height: 1px;
+                        background: #E8DED1;
+                        vertical-stretch: 0;
+                    }
                 }
 
                 Text {
@@ -963,20 +948,6 @@ export component AppWindow inherits Window {
                 }
 
                 Rectangle {
-                    height: 1px;
-                    background: #E8DED1;
-                    vertical-stretch: 0;
-                }
-
-                Text {
-                    text: "提示：左侧的“发现新诗词”会优先调用 AI，未配置时自动回退到本地意境匹配。";
-                    color: #6C6257;
-                    font-size: 12px;
-                    wrap: word-wrap;
-                    vertical-stretch: 0;
-                }
-
-                Rectangle {
                     height: 4px;
                     background: transparent;
                     vertical-stretch: 0;
@@ -1000,73 +971,44 @@ export component AppWindow inherits Window {
                 font-weight: 700;
             }
 
-            Text {
-                x: 20px;
-                y: 60px;
-                width: parent.width - 40px;
-                text: "当前保留现有的纸感暖色主题，并按参考图重构为侧边栏 / 结果列表 / 详情栏三栏布局。";
-                color: #6C6257;
-                font-size: 13px;
+                Text {
+                    x: 20px;
+                    y: 60px;
+                    width: parent.width - 40px;
+                    text: "当前为温暖纸感主题。";
+                    color: #6C6257;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                }
             }
 
-            Rectangle {
-                x: 20px;
-                y: 116px;
-                width: parent.width - 40px;
-                height: 1px;
-                background: #E8DED1;
-            }
-
-            Text {
-                x: 20px;
-                y: 138px;
-                width: parent.width - 40px;
-                text: "• 背景：F7F3EC\n• 卡片：FBF8F2\n• 高亮：E8DED1 / B78A3D\n• 文本：1F1B16 / 6C6257";
-                color: #3A342E;
-                font-size: 13px;
-            }
-        }
-
-        if root.inspector_view == "about" : Rectangle {
+        if root.inspector_view == "about" : ScrollView {
             x: 0;
             y: 0;
             width: parent.width;
             height: parent.height;
-            background: transparent;
 
-            Text {
-                x: 20px;
-                y: 22px;
-                text: "关于这款诗词桌面端";
-                color: #1F1B16;
-                font-size: 20px;
-                font-weight: 700;
-            }
+            VerticalBox {
+                width: parent.width;
+                padding: 20px;
+                spacing: 16px;
 
-            Text {
-                x: 20px;
-                y: 60px;
-                width: parent.width - 40px;
-                text: "这是一个以本地诗库为核心的桌面阅读器：可浏览诗词、收藏心仪作品，并在配置 AI 后获取发现推荐与赏析。";
-                color: #6C6257;
-                font-size: 13px;
-            }
+                Text {
+                    text: "关于这款诗词桌面端";
+                    color: #1F1B16;
+                    font-size: 20px;
+                    font-weight: 700;
+                    vertical-stretch: 0;
+                }
 
-            Rectangle {
-                x: 20px;
-                y: 122px;
-                width: parent.width - 40px;
-                height: 1px;
-                background: #E8DED1;
-            }
-
-            Text {
-                x: 20px;
-                y: 146px;
-                width: parent.width - 40px;
-                text: "当前交互：\n• 左侧切换首页 / 收藏夹 / 关于\n• 中栏搜索描述后点击“发现新诗词”\n• 右栏查看详情、收藏、生成 AI 赏析\n• 底部入口打开主题说明与 AI 设置";
-                color: #3A342E;
-                font-size: 13px;
+                Text {
+                    width: parent.width - 40px;
+                    text: "以本地诗库为底，安静地浏览、收藏与阅读诗词。";
+                    color: #6C6257;
+                    font-size: 13px;
+                    wrap: word-wrap;
+                    vertical-stretch: 0;
+                }
             }
         }
 
