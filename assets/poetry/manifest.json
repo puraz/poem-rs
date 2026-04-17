@@ -1,0 +1,11 @@
+{
+  "seed_version": 1,
+  "files": [
+    {
+      "path": "corpus.json",
+      "sha256": "e89b4cc2078e5bebe4e351bb3621308b5371ab77bde39c64cf99e9aee054e3ba",
+      "source": "Classical Chinese poetry public-domain corpus curated for MVP",
+      "license": "Public Domain"
+    }
+  ]
+}

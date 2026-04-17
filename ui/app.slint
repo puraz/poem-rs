@@ -1,0 +1,1059 @@
+import { HorizontalBox, ScrollView, VerticalBox } from "std-widgets.slint";
+
+export struct PoemRow {
+    id: string,
+    title: string,
+    meta: string,
+    snippet: string,
+    tags: string,
+    favorite_label: string,
+    favorite: bool,
+}
+
+export struct RecommendationRow {
+    id: string,
+    title: string,
+    meta: string,
+    reason: string,
+}
+
+component SidebarPrimaryAction inherits Rectangle {
+    in property <string> text;
+    callback clicked();
+
+    height: 56px;
+    border-radius: 14px;
+    background: touch.pressed ? #E2D4BF : (touch.has-hover ? #EFE4D4 : #E6DDCF);
+    border-color: touch.pressed ? #9D6D1F : (touch.has-hover ? #A97D37 : #B78A3D);
+    border-width: 1px;
+    clip: true;
+
+    Text {
+        text: "✦";
+        x: 18px;
+        y: 0;
+        height: parent.height;
+        vertical-alignment: center;
+        color: touch.pressed ? #7A591F : #8B6B3F;
+        font-size: 20px;
+        font-weight: 700;
+    }
+
+    Text {
+        text: parent.text;
+        x: 48px;
+        y: 0;
+        height: parent.height;
+        vertical-alignment: center;
+        color: #1F1B16;
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+component SidebarNavItem inherits Rectangle {
+    in property <string> icon;
+    in property <string> text;
+    in property <bool> active;
+    in property <string> caption;
+    callback clicked();
+
+    height: 56px;
+    border-radius: 14px;
+    background: root.active ? #EFE7DB : (touch.pressed ? #EEE5D9 : (touch.has-hover ? #F6F0E8 : #FBF8F2));
+    border-color: root.active ? #B78A3D : (touch.has-hover ? #D5C1A7 : #E8DED1);
+    border-width: 1px;
+    clip: true;
+
+    Text {
+        text: parent.icon;
+        x: 18px;
+        y: 0;
+        height: parent.height;
+        vertical-alignment: center;
+        color: root.active ? #8B6B3F : (touch.has-hover ? #5D5348 : #6C6257);
+        opacity: 1;
+        font-size: 18px;
+        font-weight: 700;
+    }
+
+    Text {
+        text: parent.text;
+        x: 48px;
+        y: 10px;
+        color: root.active ? #1F1B16 : (touch.has-hover ? #1F1B16 : #2B241F);
+        font-size: 16px;
+        font-weight: root.active ? 700 : 600;
+        opacity: 1;
+    }
+
+    Text {
+        text: parent.caption;
+        x: 48px;
+        y: 30px;
+        color: #8B8074;
+        font-size: 11px;
+        opacity: 1;
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+component FilterChip inherits Rectangle {
+    in property <string> text;
+    in property <bool> active;
+    callback clicked();
+
+    height: 34px;
+    border-radius: 17px;
+    background: root.active ? #E8DED1 : (touch.pressed ? #EEE4D7 : (touch.has-hover ? #F6F0E8 : #FBF8F2));
+    border-color: root.active ? #B78A3D : (touch.has-hover ? #CDB79A : #DDD4C8);
+    border-width: 1px;
+
+    label := Text {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        text: root.text;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: root.active ? #1F1B16 : (touch.has-hover ? #1F1B16 : #2B241F);
+        font-size: 13px;
+        font-weight: root.active ? 700 : 600;
+        opacity: 1;
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+component CardIconAction inherits Rectangle {
+    in property <string> label;
+    callback clicked();
+
+    width: 38px;
+    height: 38px;
+    border-radius: 19px;
+    background: touch.pressed ? #EEE4D7 : (touch.has-hover ? #F3EDE4 : #FBF8F2);
+    border-color: touch.pressed ? #B78A3D : (touch.has-hover ? #C9B292 : #DDD4C8);
+    border-width: 1px;
+
+    Text {
+        text: parent.label;
+        width: parent.width;
+        height: parent.height;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: touch.has-hover ? #3A342E : #5D5348;
+        font-size: 16px;
+        font-weight: 700;
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+component SearchField inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder-text;
+    out property <bool> has-focus: editor.has-focus;
+    callback accepted();
+
+    border-radius: 18px;
+    background: #FBF8F2;
+    border-color: editor.has-focus ? #B78A3D : #DDD4C8;
+    border-width: editor.has-focus ? 2px : 1px;
+
+    Text {
+        text: "⌕";
+        x: 18px;
+        y: 0;
+        height: parent.height;
+        vertical-alignment: center;
+        color: #8B8074;
+        font-size: 20px;
+    }
+
+    editor := TextInput {
+        x: 48px;
+        y: 12px;
+        width: parent.width - 66px;
+        height: parent.height - 24px;
+        text <=> root.text;
+        color: #2B241F;
+        selection-background-color: #D8C7AD;
+        selection-foreground-color: #1F1B16;
+        single-line: true;
+        accepted => { root.accepted(); }
+    }
+
+    if editor.text == "" : Text {
+        x: 48px;
+        y: 0;
+        width: parent.width - 66px;
+        height: parent.height;
+        text: root.placeholder-text;
+        color: #8B8074;
+        vertical-alignment: center;
+        font-size: 13px;
+    }
+
+    TouchArea {
+        clicked => { editor.focus(); }
+    }
+}
+
+component InputField inherits Rectangle {
+    in-out property <string> text;
+    in property <string> placeholder-text;
+    out property <bool> has-focus: editor.has-focus;
+    callback accepted();
+
+    border-radius: 14px;
+    background: #FBF8F2;
+    border-color: editor.has-focus ? #B78A3D : #DDD4C8;
+    border-width: editor.has-focus ? 2px : 1px;
+
+    editor := TextInput {
+        x: 14px;
+        y: 10px;
+        width: parent.width - 28px;
+        height: parent.height - 20px;
+        text <=> root.text;
+        color: #2B241F;
+        selection-background-color: #D8C7AD;
+        selection-foreground-color: #1F1B16;
+        single-line: true;
+        accepted => { root.accepted(); }
+    }
+
+    if editor.text == "" : Text {
+        x: 14px;
+        y: 0;
+        width: parent.width - 28px;
+        height: parent.height;
+        text: root.placeholder-text;
+        color: #A29588;
+        vertical-alignment: center;
+        font-size: 13px;
+    }
+
+    TouchArea {
+        clicked => { editor.focus(); }
+    }
+}
+
+component ActionButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    callback clicked();
+
+    border-radius: 12px;
+    background: !root.enabled ? #F5EFE5 : (touch.pressed ? #E8DED1 : (touch.has-hover ? #F3EDE4 : #FBF8F2));
+    border-color: touch.pressed ? #B78A3D : (touch.has-hover ? #C9B292 : #DDD4C8);
+    border-width: 1px;
+    opacity: root.enabled ? 1 : 0.6;
+
+    Text {
+        text: parent.text;
+        width: parent.width;
+        height: parent.height;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        color: #2B241F;
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+}
+
+component ToggleRow inherits Rectangle {
+    in property <string> text;
+    in-out property <bool> checked;
+    callback toggled();
+
+    background: transparent;
+
+    Rectangle {
+        x: 0;
+        y: (parent.height - 24px) / 2;
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        background: root.checked ? #CBE4FF : #FBF8F2;
+        border-color: root.checked ? #78AEE8 : #CFC4B8;
+        border-width: 1px;
+
+        if root.checked : Text {
+            text: "✓";
+            width: parent.width;
+            height: parent.height;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            color: #1F1B16;
+            font-size: 15px;
+            font-weight: 700;
+        }
+    }
+
+    Text {
+        x: 36px;
+        y: 0;
+        width: parent.width - 36px;
+        height: parent.height;
+        text: root.text;
+        color: #5D5348;
+        vertical-alignment: center;
+        font-size: 13px;
+    }
+
+    TouchArea {
+        clicked => {
+            root.checked = !root.checked;
+            root.toggled();
+        }
+    }
+}
+
+component PoemListCard inherits Rectangle {
+    in property <string> title;
+    in property <string> meta;
+    in property <string> snippet;
+    in property <bool> favorite;
+    in property <bool> selected;
+    callback clicked();
+
+    height: 118px;
+    border-radius: 16px;
+    background: root.selected ? #F0E9DE : (touch.pressed ? #EFE5D8 : (touch.has-hover ? #F6F0E8 : #FBF8F2));
+    border-color: root.selected ? #B78A3D : (touch.has-hover ? #D0BA9C : #DDD4C8);
+    border-width: 1px;
+
+    Text {
+        text: parent.title;
+        x: 18px;
+        y: 16px;
+        color: touch.has-hover && !root.selected ? #16120E : #1F1B16;
+        font-size: 17px;
+        font-weight: 700;
+    }
+
+    Text {
+        text: parent.meta;
+        x: 18px;
+        y: 44px;
+        color: touch.has-hover && !root.selected ? #5D5348 : #6C6257;
+        font-size: 12px;
+    }
+
+    Text {
+        text: parent.snippet;
+        x: 18px;
+        y: 66px;
+        width: parent.width - 70px;
+        color: touch.has-hover && !root.selected ? #3F3831 : #4E463E;
+        font-size: 13px;
+    }
+
+    Text {
+        text: parent.favorite ? "♥" : "♡";
+        x: parent.width - 34px;
+        y: 18px;
+        color: parent.favorite ? #B45309 : #B8ADA0;
+        font-size: 18px;
+    }
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+}
+
+export component AppWindow inherits Window {
+    title: "诗词收藏";
+    width: 1200px;
+    height: 800px;
+    background: #F7F3EC;
+
+    blurSink := FocusScope {
+        x: 0;
+        y: 0;
+        width: 1px;
+        height: 1px;
+        focus-on-click: false;
+    }
+
+    TouchArea {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        clicked => { blurSink.focus(); }
+    }
+
+    in-out property <[PoemRow]> poem_rows;
+    in-out property <[RecommendationRow]> recommendation_rows;
+    in-out property <string> section_title;
+    in-out property <string> poem_count;
+    in-out property <string> banner_text;
+    in-out property <string> selected_poem_id;
+    in-out property <string> selected_title;
+    in-out property <string> selected_meta;
+    in-out property <string> selected_tags;
+    in-out property <string> selected_content;
+    in-out property <string> selected_source;
+    in-out property <bool> selected_favorite;
+    in-out property <string> analysis_text;
+    in-out property <string> analysis_status;
+    in-out property <string> ai_mode_label;
+    in-out property <bool> ai_busy;
+    in-out property <string> discover_query;
+    in-out property <string> discover_placeholder;
+    in-out property <string> ai_base_url;
+    in-out property <string> ai_model;
+    in-out property <bool> allow_file_fallback;
+    in-out property <string> secret_warning;
+
+    property <string> sidebar_view: "home";
+    property <string> inspector_view: "detail";
+    property <length> settings_warning_offset: root.secret_warning.is-empty ? 0px : 48px;
+
+    callback select_filter(string);
+    callback select_poem(string);
+    callback toggle_favorite(string);
+    callback run_discover(string);
+    callback request_appreciation(string);
+    callback save_ai_settings(string, string, string, bool);
+    callback clear_ai_key();
+
+    Rectangle {
+        x: 16px;
+        y: 16px;
+        width: 220px;
+        height: parent.height - 32px;
+        border-radius: 22px;
+        background: #FBF8F2;
+        border-color: #DDD4C8;
+        border-width: 1px;
+
+        discoverButton := SidebarPrimaryAction {
+            x: 16px;
+            y: 16px;
+            width: parent.width - 32px;
+            text: root.ai_busy ? "正在发现…" : "发现新诗词";
+            clicked => {
+                root.sidebar_view = "home";
+                root.inspector_view = "detail";
+                root.select_filter("recommended");
+                root.run_discover(root.discover_query);
+            }
+        }
+
+        homeNav := SidebarNavItem {
+            x: 16px;
+            y: 92px;
+            width: parent.width - 32px;
+            icon: "⌂";
+            text: "首页";
+            caption: "浏览当前诗库";
+            active: root.sidebar_view == "home";
+            clicked => {
+                root.sidebar_view = "home";
+                root.inspector_view = "detail";
+                root.select_filter("recommended");
+            }
+        }
+
+        favoritesNav := SidebarNavItem {
+            x: 16px;
+            y: 156px;
+            width: parent.width - 32px;
+            icon: "♥";
+            text: "收藏夹";
+            caption: "查看已收藏诗词";
+            active: root.sidebar_view == "favorites";
+            clicked => {
+                root.sidebar_view = "favorites";
+                root.inspector_view = "detail";
+                root.select_filter("favorites");
+            }
+        }
+
+        aboutNav := SidebarNavItem {
+            x: 16px;
+            y: 220px;
+            width: parent.width - 32px;
+            icon: "i";
+            text: "关于";
+            caption: "查看应用说明";
+            active: root.sidebar_view == "about";
+            clicked => {
+                root.sidebar_view = "about";
+                root.inspector_view = "about";
+            }
+        }
+
+        Rectangle {
+            x: 16px;
+            y: parent.height - 138px;
+            width: parent.width - 32px;
+            height: 1px;
+            background: #E8DED1;
+        }
+
+        themeNav := SidebarNavItem {
+            x: 16px;
+            y: parent.height - 122px;
+            width: parent.width - 32px;
+            icon: "◐";
+            text: "主题设置";
+            caption: "纸感 / 现代排版";
+            active: root.inspector_view == "theme";
+            clicked => {
+                root.inspector_view = "theme";
+            }
+        }
+
+        settingsNav := SidebarNavItem {
+            x: 16px;
+            y: parent.height - 58px;
+            width: parent.width - 32px;
+            icon: "⚙";
+            text: "AI 设置";
+            caption: root.ai_model;
+            active: root.inspector_view == "settings";
+            clicked => {
+                root.inspector_view = "settings";
+            }
+        }
+    }
+
+    Rectangle {
+        x: 252px;
+        y: 16px;
+        width: 600px;
+        height: parent.height - 32px;
+        background: transparent;
+
+        searchInput := SearchField {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: 60px;
+            text <=> root.discover_query;
+            placeholder-text: root.discover_placeholder;
+            accepted => { root.run_discover(root.discover_query); }
+        }
+
+        Text {
+            x: 0;
+            y: 76px;
+            text: root.section_title;
+            color: #1F1B16;
+            font-size: 26px;
+            font-weight: 700;
+        }
+
+        Text {
+            x: 0;
+            y: 108px;
+            width: parent.width;
+            text: root.banner_text;
+            color: #6C6257;
+            font-size: 13px;
+        }
+
+        allChip := FilterChip {
+            x: 0;
+            y: 146px;
+            width: 86px;
+            text: "全部";
+            active: root.section_title == "首页" || root.section_title == "推荐诗库" || root.section_title == "发现结果";
+            clicked => {
+                root.sidebar_view = "home";
+                root.inspector_view = "detail";
+                root.select_filter("recommended");
+            }
+        }
+
+        tangChip := FilterChip {
+            x: 98px;
+            y: 146px;
+            width: 96px;
+            text: "唐诗精选";
+            active: root.section_title == "唐诗精选";
+            clicked => {
+                root.sidebar_view = "home";
+                root.inspector_view = "detail";
+                root.select_filter("tang");
+            }
+        }
+
+        songChip := FilterChip {
+            x: 206px;
+            y: 146px;
+            width: 96px;
+            text: "宋词清单";
+            active: root.section_title == "宋词清单";
+            clicked => {
+                root.sidebar_view = "home";
+                root.inspector_view = "detail";
+                root.select_filter("song");
+            }
+        }
+
+        randomChip := FilterChip {
+            x: 314px;
+            y: 146px;
+            width: 96px;
+            text: "随机精选";
+            active: root.section_title == "随机精选";
+            clicked => {
+                root.sidebar_view = "home";
+                root.inspector_view = "detail";
+                root.select_filter("random");
+            }
+        }
+
+        Text {
+            x: parent.width - 170px;
+            y: 154px;
+            width: 170px;
+            horizontal-alignment: right;
+            text: root.poem_count;
+            color: #8B8074;
+            font-size: 12px;
+        }
+
+        Rectangle {
+            x: 0;
+            y: 196px;
+            width: parent.width;
+            height: parent.height - 196px;
+            border-radius: 22px;
+            background: #FBF8F2;
+            border-color: #DDD4C8;
+            border-width: 1px;
+
+            ScrollView {
+                x: 0;
+                y: 0;
+                width: parent.width;
+                height: parent.height;
+                viewport-height: parent.height;
+
+                VerticalBox {
+                    padding: 14px;
+                    spacing: 12px;
+
+                    for poem[index] in root.poem_rows : PoemListCard {
+                        width: 572px;
+                        title: poem.title;
+                        meta: poem.meta;
+                        snippet: poem.snippet;
+                        favorite: poem.favorite;
+                        selected: poem.id == root.selected_poem_id;
+                        clicked => {
+                            root.inspector_view = "detail";
+                            root.select_poem(poem.id);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        x: 868px;
+        y: 16px;
+        width: 316px;
+        height: parent.height - 32px;
+        border-radius: 22px;
+        background: #FBF8F2;
+        border-color: #DDD4C8;
+        border-width: 1px;
+
+        if root.inspector_view == "detail" : ScrollView {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: parent.height;
+            viewport-height: parent.height;
+
+            Rectangle {
+                width: parent.width;
+                height: 980px;
+                background: transparent;
+
+                Text {
+                    x: 20px;
+                    y: 22px;
+                    text: "▣";
+                    color: #8B8074;
+                    font-size: 18px;
+                }
+
+                Text {
+                    x: 56px;
+                    y: 20px;
+                    width: parent.width - 132px;
+                    text: root.selected_title;
+                    color: #1F1B16;
+                    font-size: 20px;
+                    font-weight: 700;
+                }
+
+                favAction := CardIconAction {
+                    x: parent.width - 54px;
+                    y: 14px;
+                    label: root.selected_favorite ? "♥" : "♡";
+                    clicked => { root.toggle_favorite(root.selected_poem_id); }
+                }
+
+                aiAction := CardIconAction {
+                    x: parent.width - 98px;
+                    y: 14px;
+                    label: root.ai_busy ? "…" : "AI";
+                    clicked => {
+                        if (!root.ai_busy) {
+                            root.request_appreciation(root.selected_poem_id);
+                        }
+                    }
+                }
+
+                Text {
+                    x: 56px;
+                    y: 56px;
+                    width: parent.width - 76px;
+                    text: root.selected_meta;
+                    color: #6C6257;
+                    font-size: 13px;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 92px;
+                    width: parent.width - 40px;
+                    text: root.selected_tags;
+                    color: #8B6B3F;
+                    font-size: 12px;
+                }
+
+                Rectangle {
+                    x: 20px;
+                    y: 126px;
+                    width: parent.width - 40px;
+                    height: 1px;
+                    background: #E8DED1;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 148px;
+                    width: parent.width - 40px;
+                    text: root.selected_content;
+                    color: #1F1B16;
+                    font-size: 18px;
+                    horizontal-alignment: center;
+                }
+
+                Rectangle {
+                    x: 20px;
+                    y: 516px;
+                    width: parent.width - 40px;
+                    height: 1px;
+                    background: #E8DED1;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 538px;
+                    text: "AI 赏析";
+                    color: #1F1B16;
+                    font-size: 16px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 566px;
+                    width: parent.width - 40px;
+                    text: root.analysis_status;
+                    color: #8B6B3F;
+                    font-size: 12px;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 596px;
+                    width: parent.width - 40px;
+                    text: root.analysis_text;
+                    color: #3A342E;
+                    font-size: 13px;
+                }
+
+                Rectangle {
+                    x: 20px;
+                    y: 862px;
+                    width: parent.width - 40px;
+                    height: 1px;
+                    background: #E8DED1;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 882px;
+                    width: parent.width - 40px;
+                    text: root.selected_source;
+                    color: #8B8074;
+                    font-size: 11px;
+                }
+            }
+        }
+
+        if root.inspector_view == "settings" : ScrollView {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: parent.height;
+            viewport-height: parent.height;
+
+            Rectangle {
+                width: parent.width;
+                height: 760px;
+                background: transparent;
+
+                Text {
+                    x: 20px;
+                    y: 22px;
+                    text: "AI 设置";
+                    color: #1F1B16;
+                    font-size: 20px;
+                    font-weight: 700;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 58px;
+                    width: parent.width - 40px;
+                    text: "当前模式：" + root.ai_mode_label;
+                    color: #6C6257;
+                    font-size: 13px;
+                }
+
+                if !root.secret_warning.is-empty : Text {
+                    x: 20px;
+                    y: 86px;
+                    width: parent.width - 40px;
+                    text: root.secret_warning;
+                    color: #8B6B3F;
+                    font-size: 12px;
+                }
+
+                Text { x: 20px; y: 92px + root.settings_warning_offset; text: "Base URL"; color: #5D5348; font-size: 12px; }
+                baseInput := InputField {
+                    x: 20px;
+                    y: 114px + root.settings_warning_offset;
+                    width: parent.width - 40px;
+                    height: 44px;
+                    text <=> root.ai_base_url;
+                    placeholder-text: "https://api.openai.com/v1";
+                }
+
+                Text { x: 20px; y: 174px + root.settings_warning_offset; text: "Model"; color: #5D5348; font-size: 12px; }
+                modelInput := InputField {
+                    x: 20px;
+                    y: 196px + root.settings_warning_offset;
+                    width: parent.width - 40px;
+                    height: 44px;
+                    text <=> root.ai_model;
+                    placeholder-text: "gpt-4.1-mini";
+                }
+
+                Text { x: 20px; y: 256px + root.settings_warning_offset; text: "API Key"; color: #5D5348; font-size: 12px; }
+                keyInput := InputField {
+                    x: 20px;
+                    y: 278px + root.settings_warning_offset;
+                    width: parent.width - 40px;
+                    height: 44px;
+                    placeholder-text: "输入 API Key";
+                }
+
+                fallbackToggle := ToggleRow {
+                    x: 20px;
+                    y: 340px + root.settings_warning_offset;
+                    width: parent.width - 40px;
+                    height: 28px;
+                    text: "允许文件回退存储";
+                    checked <=> root.allow_file_fallback;
+                }
+
+                saveButton := ActionButton {
+                    x: 20px;
+                    y: 396px + root.settings_warning_offset;
+                    width: 128px;
+                    height: 44px;
+                    text: "保存设置";
+                    clicked => {
+                        root.save_ai_settings(baseInput.text, modelInput.text, keyInput.text, root.allow_file_fallback);
+                        keyInput.text = "";
+                    }
+                }
+
+                clearButton := ActionButton {
+                    x: 160px;
+                    y: 396px + root.settings_warning_offset;
+                    width: 116px;
+                    height: 44px;
+                    text: "清除 Key";
+                    clicked => { root.clear_ai_key(); }
+                }
+
+                Rectangle {
+                    x: 20px;
+                    y: 468px + root.settings_warning_offset;
+                    width: parent.width - 40px;
+                    height: 1px;
+                    background: #E8DED1;
+                }
+
+                Text {
+                    x: 20px;
+                    y: 490px + root.settings_warning_offset;
+                    width: parent.width - 40px;
+                    text: "提示：左侧的“发现新诗词”会优先调用 AI，未配置时自动回退到本地意境匹配。";
+                    color: #6C6257;
+                    font-size: 12px;
+                }
+            }
+        }
+
+        if root.inspector_view == "theme" : Rectangle {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: parent.height;
+            background: transparent;
+
+            Text {
+                x: 20px;
+                y: 22px;
+                text: "主题设置";
+                color: #1F1B16;
+                font-size: 20px;
+                font-weight: 700;
+            }
+
+            Text {
+                x: 20px;
+                y: 60px;
+                width: parent.width - 40px;
+                text: "当前保留现有的纸感暖色主题，并按参考图重构为侧边栏 / 结果列表 / 详情栏三栏布局。";
+                color: #6C6257;
+                font-size: 13px;
+            }
+
+            Rectangle {
+                x: 20px;
+                y: 116px;
+                width: parent.width - 40px;
+                height: 1px;
+                background: #E8DED1;
+            }
+
+            Text {
+                x: 20px;
+                y: 138px;
+                width: parent.width - 40px;
+                text: "• 背景：F7F3EC\n• 卡片：FBF8F2\n• 高亮：E8DED1 / B78A3D\n• 文本：1F1B16 / 6C6257";
+                color: #3A342E;
+                font-size: 13px;
+            }
+        }
+
+        if root.inspector_view == "about" : Rectangle {
+            x: 0;
+            y: 0;
+            width: parent.width;
+            height: parent.height;
+            background: transparent;
+
+            Text {
+                x: 20px;
+                y: 22px;
+                text: "关于这款诗词桌面端";
+                color: #1F1B16;
+                font-size: 20px;
+                font-weight: 700;
+            }
+
+            Text {
+                x: 20px;
+                y: 60px;
+                width: parent.width - 40px;
+                text: "这是一个以本地诗库为核心的桌面阅读器：可浏览诗词、收藏心仪作品，并在配置 AI 后获取发现推荐与赏析。";
+                color: #6C6257;
+                font-size: 13px;
+            }
+
+            Rectangle {
+                x: 20px;
+                y: 122px;
+                width: parent.width - 40px;
+                height: 1px;
+                background: #E8DED1;
+            }
+
+            Text {
+                x: 20px;
+                y: 146px;
+                width: parent.width - 40px;
+                text: "当前交互：\n• 左侧切换首页 / 收藏夹 / 关于\n• 中栏搜索描述后点击“发现新诗词”\n• 右栏查看详情、收藏、生成 AI 赏析\n• 底部入口打开主题说明与 AI 设置";
+                color: #3A342E;
+                font-size: 13px;
+            }
+        }
+
+        fab := Rectangle {
+            x: parent.width - 70px;
+            y: parent.height - 70px;
+            width: 54px;
+            height: 54px;
+            border-radius: 27px;
+            background: fabTouch.pressed ? #E2D4BF : (fabTouch.has-hover ? #EFE4D4 : #E6DDCF);
+            border-color: fabTouch.pressed ? #9D6D1F : (fabTouch.has-hover ? #A97D37 : #B78A3D);
+            border-width: 1px;
+
+            Text {
+                text: "+";
+                width: parent.width;
+                height: parent.height;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                color: fabTouch.pressed ? #7A591F : #8B6B3F;
+                font-size: 26px;
+                font-weight: 700;
+            }
+
+            fabTouch := TouchArea {
+                clicked => {
+                    if (!root.ai_busy) {
+                        root.request_appreciation(root.selected_poem_id);
+                    }
+                }
+            }
+        }
+    }
+}

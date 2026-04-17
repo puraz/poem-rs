@@ -1,0 +1,24 @@
+[package]
+name = "poem-rs"
+version = "0.1.0"
+edition = "2024"
+build = "build.rs"
+
+[dependencies]
+anyhow = "1.0.102"
+directories = "6.0.0"
+keyring = "4.0.0-rc.3"
+libc = "0.2.185"
+keyring-core = "=0.7.2"
+reqwest = { version = "0.13.2", default-features = false, features = ["blocking", "json", "rustls"] }
+rusqlite = { version = "0.39.0", features = ["bundled"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.149"
+sha2 = "0.10.9"
+slint = "1.16.0"
+thiserror = "2.0.18"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.23", features = ["fmt", "env-filter"] }
+
+[build-dependencies]
+slint-build = "1.16.0"

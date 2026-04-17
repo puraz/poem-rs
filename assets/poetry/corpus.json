@@ -1,0 +1,82 @@
+[
+  {
+    "id": "tang.li-bai.jing-ye-si",
+    "title": "静夜思",
+    "author": "李白",
+    "dynasty": "唐",
+    "tags": ["思乡", "月夜", "五绝"],
+    "lines": ["床前明月光", "疑是地上霜", "举头望明月", "低头思故乡"],
+    "source": "《全唐诗》",
+    "license": "Public Domain"
+  },
+  {
+    "id": "tang.meng-hao-ran.chun-xiao",
+    "title": "春晓",
+    "author": "孟浩然",
+    "dynasty": "唐",
+    "tags": ["春景", "清晨", "五绝"],
+    "lines": ["春眠不觉晓", "处处闻啼鸟", "夜来风雨声", "花落知多少"],
+    "source": "《全唐诗》",
+    "license": "Public Domain"
+  },
+  {
+    "id": "tang.wang-wei.shan-ju-qiu-ming",
+    "title": "山居秋暝",
+    "author": "王维",
+    "dynasty": "唐",
+    "tags": ["山水", "秋夜", "田园"],
+    "lines": ["空山新雨后", "天气晚来秋", "明月松间照", "清泉石上流", "竹喧归浣女", "莲动下渔舟", "随意春芳歇", "王孙自可留"],
+    "source": "《全唐诗》",
+    "license": "Public Domain"
+  },
+  {
+    "id": "tang.wang-zhi-huan.deng-guan-que-lou",
+    "title": "登鹳雀楼",
+    "author": "王之涣",
+    "dynasty": "唐",
+    "tags": ["登高", "豪迈", "边塞"],
+    "lines": ["白日依山尽", "黄河入海流", "欲穷千里目", "更上一层楼"],
+    "source": "《全唐诗》",
+    "license": "Public Domain"
+  },
+  {
+    "id": "song.su-shi.shui-diao-ge-tou",
+    "title": "水调歌头·明月几时有",
+    "author": "苏轼",
+    "dynasty": "宋",
+    "tags": ["中秋", "明月", "豪放"],
+    "lines": ["明月几时有", "把酒问青天", "不知天上宫阙", "今夕是何年", "我欲乘风归去", "又恐琼楼玉宇", "高处不胜寒", "起舞弄清影", "何似在人间"],
+    "source": "《东坡乐府》",
+    "license": "Public Domain"
+  },
+  {
+    "id": "song.li-qing-zhao.sheng-sheng-man",
+    "title": "声声慢·寻寻觅觅",
+    "author": "李清照",
+    "dynasty": "宋",
+    "tags": ["愁绪", "秋意", "婉约"],
+    "lines": ["寻寻觅觅", "冷冷清清", "凄凄惨惨戚戚", "乍暖还寒时候", "最难将息"],
+    "source": "《漱玉词》",
+    "license": "Public Domain"
+  },
+  {
+    "id": "tang.du-fu.wang-yue",
+    "title": "望岳",
+    "author": "杜甫",
+    "dynasty": "唐",
+    "tags": ["山岳", "壮志", "五律"],
+    "lines": ["岱宗夫如何", "齐鲁青未了", "造化钟神秀", "阴阳割昏晓", "荡胸生曾云", "决眦入归鸟", "会当凌绝顶", "一览众山小"],
+    "source": "《全唐诗》",
+    "license": "Public Domain"
+  },
+  {
+    "id": "tang.bai-ju-yi.fu-de-gu-yuan-cao-song-bie",
+    "title": "赋得古原草送别",
+    "author": "白居易",
+    "dynasty": "唐",
+    "tags": ["送别", "草木", "离情"],
+    "lines": ["离离原上草", "一岁一枯荣", "野火烧不尽", "春风吹又生", "远芳侵古道", "晴翠接荒城", "又送王孙去", "萋萋满别情"],
+    "source": "《全唐诗》",
+    "license": "Public Domain"
+  }
+]
