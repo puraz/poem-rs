@@ -218,7 +218,7 @@ impl AppController {
         app.set_ai_busy(self.ai_busy);
         app.set_ai_mode_label(self.current_ai_mode().label().into());
         app.set_discover_query(self.discover_query.clone().into());
-        app.set_discover_placeholder(soft_wrap(self.discover_placeholder(), 18).into());
+        app.set_discover_placeholder(self.discover_placeholder().into());
         app.set_analysis_status(self.analysis_status.clone().into());
         app.set_analysis_text(soft_wrap(&self.analysis_text, 22).into());
         app.set_ai_base_url(self.ai_config.settings.base_url.clone().into());

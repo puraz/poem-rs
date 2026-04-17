@@ -173,10 +173,11 @@ component SearchField inherits Rectangle {
     background: #FBF8F2;
     border-color: editor.has-focus ? #B78A3D : #DDD4C8;
     border-width: editor.has-focus ? 2px : 1px;
+    clip: true;
 
     TintedIcon {
         x: 18px;
-        y: 18px;
+        y: (parent.height - self.height) / 2;
         width: 20px;
         height: 20px;
         source: @image-url("../assets/icons/search.svg");
@@ -185,14 +186,16 @@ component SearchField inherits Rectangle {
 
     editor := TextInput {
         x: 52px;
-        y: 12px;
+        y: 0;
         width: parent.width - 72px;
-        height: parent.height - 24px;
+        height: parent.height;
         text <=> root.text;
         color: #2B241F;
         selection-background-color: #D8C7AD;
         selection-foreground-color: #1F1B16;
         single-line: true;
+        wrap: no-wrap;
+        vertical-alignment: center;
         accepted => { root.accepted(); }
     }
 
@@ -205,6 +208,8 @@ component SearchField inherits Rectangle {
         color: #8B8074;
         vertical-alignment: center;
         font-size: 13px;
+        wrap: no-wrap;
+        overflow: elide;
     }
 
     TouchArea {
@@ -222,17 +227,20 @@ component InputField inherits Rectangle {
     background: #FBF8F2;
     border-color: editor.has-focus ? #B78A3D : #DDD4C8;
     border-width: editor.has-focus ? 2px : 1px;
+    clip: true;
 
     editor := TextInput {
         x: 14px;
-        y: 10px;
+        y: 0;
         width: parent.width - 28px;
-        height: parent.height - 20px;
+        height: parent.height;
         text <=> root.text;
         color: #2B241F;
         selection-background-color: #D8C7AD;
         selection-foreground-color: #1F1B16;
         single-line: true;
+        wrap: no-wrap;
+        vertical-alignment: center;
         accepted => { root.accepted(); }
     }
 
@@ -245,6 +253,8 @@ component InputField inherits Rectangle {
         color: #A29588;
         vertical-alignment: center;
         font-size: 13px;
+        wrap: no-wrap;
+        overflow: elide;
     }
 
     TouchArea {
@@ -549,7 +559,7 @@ export component AppWindow inherits Window {
             x: 0;
             y: 0;
             width: parent.width;
-            height: 60px;
+            height: 56px;
             text <=> root.discover_query;
             placeholder-text: root.discover_placeholder;
             accepted => { root.run_discover(root.discover_query); }
