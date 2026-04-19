@@ -693,12 +693,16 @@ export component AppWindow inherits Window {
                 width: parent.width;
                 padding: 20px;
                 spacing: 18px;
+                alignment: start;
 
                 VerticalBox {
-                    spacing: 10px;
+                    spacing: 6px;
+                    vertical-stretch: 0;
+                    alignment: start;
 
                     HorizontalBox {
                         spacing: 12px;
+                        vertical-stretch: 0;
 
                         TintedIcon {
                             width: 22px;
