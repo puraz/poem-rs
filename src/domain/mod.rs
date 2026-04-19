@@ -87,6 +87,35 @@ impl AiRecommendation {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct DiscoveredPoem {
+    pub title: String,
+    pub content: String,
+    pub author: String,
+    pub dynasty: String,
+    #[serde(default)]
+    pub category: String,
+    #[serde(default)]
+    pub notes: String,
+    #[serde(rename = "relevanceScore")]
+    pub relevance_score: f32,
+    #[serde(rename = "matchReason")]
+    pub match_reason: String,
+    #[serde(rename = "isRecommendation", default)]
+    pub is_recommendation: bool,
+}
+
+impl DiscoveredPoem {
+    pub fn snippet(&self) -> String {
+        self.content.lines().take(3).collect::<Vec<_>>().join(" · ")
+    }
+
+    pub fn relevance_percent(&self) -> String {
+        let score = self.relevance_score.clamp(0.0, 1.0) * 100.0;
+        format!("{score:.0}%")
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AiAppreciation {
     pub poem_id: String,

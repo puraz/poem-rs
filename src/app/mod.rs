@@ -14,16 +14,13 @@ use crate::config::ai::{
     SecretPersistencePlan,
 };
 use crate::config::app::AppPaths;
-use crate::domain::{AiAppreciation, AiRecommendation, Poem, PoemCandidate};
+use crate::domain::{AiAppreciation, DiscoveredPoem, Poem};
 use crate::services::ai::{
-    HttpAiTransport, OpenAiCompatibleClient, build_appreciation_prompt, build_recommendation_prompt,
+    HttpAiTransport, OpenAiCompatibleClient, build_appreciation_prompt, build_discovery_prompt,
 };
-use crate::services::local::{curated_recommendations, discover_locally};
-use crate::services::normalization::{
-    RecommendationResolution, resolve_recommendations, validate_appreciation,
-};
+use crate::services::normalization::validate_appreciation;
 use crate::storage::{AppDatabase, StoredAiConfig, WindowGeometry};
-use crate::{AppWindow, PoemRow, RecommendationRow};
+use crate::{AppWindow, DiscoveryResultRow, PoemRow};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum FilterKind {
@@ -54,6 +51,12 @@ impl FilterKind {
             Self::Random => "随机精选",
         }
     }
+}
+
+#[derive(Clone, Debug)]
+struct PendingDiscoveryResult {
+    id: String,
+    poem: DiscoveredPoem,
 }
 
 pub fn run() -> Result<()> {
@@ -231,8 +234,40 @@ fn bind_callbacks(app: &AppWindow, controller: Arc<Mutex<AppController>>) {
 
     let weak = app.as_weak();
     let ctrl = controller.clone();
-    app.on_run_discover(move |query| {
-        AppController::spawn_discover(ctrl.clone(), weak.clone(), query.to_string());
+    app.on_run_local_search(move |query| {
+        if let Some(window) = weak.upgrade() {
+            let _ = ctrl
+                .lock()
+                .unwrap()
+                .set_local_search(query.as_str(), &window);
+        }
+    });
+
+    let weak = app.as_weak();
+    let ctrl = controller.clone();
+    app.on_run_discovery_search(move |query| {
+        AppController::spawn_discovery_search(ctrl.clone(), weak.clone(), query.to_string());
+    });
+
+    let weak = app.as_weak();
+    let ctrl = controller.clone();
+    app.on_import_discovery(move |item_id| {
+        if let Some(window) = weak.upgrade()
+            && ctrl
+                .lock()
+                .unwrap()
+                .import_discovery(item_id.as_str(), &window)
+                .is_ok()
+        {
+            schedule_toast_dismiss(weak.clone());
+        }
+    });
+
+    let weak = app.as_weak();
+    app.on_dismiss_toast(move || {
+        if let Some(window) = weak.upgrade() {
+            window.set_toast_visible(false);
+        }
     });
 
     let weak = app.as_weak();
@@ -264,6 +299,14 @@ fn bind_callbacks(app: &AppWindow, controller: Arc<Mutex<AppController>>) {
     });
 }
 
+fn schedule_toast_dismiss(weak: slint::Weak<AppWindow>) {
+    slint::Timer::single_shot(Duration::from_secs(2), move || {
+        if let Some(window) = weak.upgrade() {
+            window.set_toast_visible(false);
+        }
+    });
+}
+
 struct AppController {
     db: AppDatabase,
     paths: AppPaths,
@@ -271,8 +314,13 @@ struct AppController {
     filter: FilterKind,
     selected_poem_id: Option<String>,
     ai_busy: bool,
-    discover_query: String,
-    recommendations: Vec<AiRecommendation>,
+    local_search_query: String,
+    discovery_query: String,
+    discovery_busy: bool,
+    discovery_status: String,
+    discovery_results: Vec<PendingDiscoveryResult>,
+    toast_message: String,
+    toast_visible: bool,
     analysis_poem_id: Option<String>,
     analysis_text: String,
 }
@@ -288,8 +336,13 @@ impl AppController {
             filter: FilterKind::Recommended,
             selected_poem_id,
             ai_busy: false,
-            discover_query: String::new(),
-            recommendations: Vec::new(),
+            local_search_query: String::new(),
+            discovery_query: String::new(),
+            discovery_busy: false,
+            discovery_status: String::new(),
+            discovery_results: Vec::new(),
+            toast_message: String::new(),
+            toast_visible: false,
             analysis_poem_id: None,
             analysis_text: String::new(),
         })
@@ -304,7 +357,7 @@ impl AppController {
             self.selected_poem_id = visible.first().map(|poem| poem.id.clone());
         }
         if let Some(selected_id) = self.selected_poem_id.clone()
-            && !poems.iter().any(|poem| poem.id == selected_id)
+            && !visible.iter().any(|poem| poem.id == selected_id)
         {
             self.selected_poem_id = visible.first().map(|poem| poem.id.clone());
         }
@@ -314,8 +367,7 @@ impl AppController {
             .as_deref()
             .and_then(|poem_id| poems.iter().find(|poem| poem.id == poem_id))
             .cloned()
-            .or_else(|| visible.first().cloned())
-            .or_else(|| poems.first().cloned());
+            .or_else(|| visible.first().cloned());
 
         if let Some(poem) = &selected {
             self.selected_poem_id = Some(poem.id.clone());
@@ -328,18 +380,21 @@ impl AppController {
             }
         }
 
-        let section_title =
-            if self.filter == FilterKind::Recommended && !self.recommendations.is_empty() {
-                "发现结果"
-            } else {
-                self.filter.title()
-            };
+        let section_title = if self.local_search_query.trim().is_empty() {
+            self.filter.title()
+        } else {
+            "本地搜索结果"
+        };
         app.set_section_title(section_title.into());
         app.set_poem_count(format!("共 {} 首 · 收藏 {} 首", poems.len(), favorites).into());
         app.set_ai_busy(self.ai_busy);
         app.set_ai_mode_label(self.current_ai_mode().label().into());
-        app.set_discover_query(self.discover_query.clone().into());
-        app.set_discover_placeholder(self.discover_placeholder().into());
+        app.set_local_search_query(self.local_search_query.clone().into());
+        app.set_discovery_query(self.discovery_query.clone().into());
+        app.set_discovery_busy(self.discovery_busy);
+        app.set_discovery_status(self.discovery_status.clone().into());
+        app.set_toast_message(self.toast_message.clone().into());
+        app.set_toast_visible(self.toast_visible);
         app.set_analysis_text(soft_wrap(&self.analysis_text, 22).into());
         app.set_ai_base_url(self.ai_config.settings.base_url.clone().into());
         app.set_ai_model(self.ai_config.settings.model.clone().into());
@@ -355,8 +410,8 @@ impl AppController {
         app.set_poem_rows(ModelRc::from(std::rc::Rc::new(VecModel::from(
             visible.iter().map(poem_to_row).collect::<Vec<_>>(),
         ))));
-        app.set_recommendation_rows(ModelRc::from(std::rc::Rc::new(VecModel::from(
-            self.recommendation_rows(&poems),
+        app.set_discovery_rows(ModelRc::from(std::rc::Rc::new(VecModel::from(
+            self.discovery_rows(),
         ))));
 
         if let Some(poem) = selected {
@@ -382,6 +437,12 @@ impl AppController {
 
     fn set_filter(&mut self, value: &str, app: &AppWindow) -> Result<()> {
         self.filter = FilterKind::from_label(value);
+        self.local_search_query.clear();
+        self.render(app)
+    }
+
+    fn set_local_search(&mut self, query: &str, app: &AppWindow) -> Result<()> {
+        self.local_search_query = query.trim().to_string();
         self.render(app)
     }
 
@@ -485,55 +546,38 @@ impl AppController {
             .mode_for(secret.is_some(), persistence)
     }
 
-    fn discover_placeholder(&self) -> &'static str {
-        match self.current_ai_mode() {
-            AiMode::Configured | AiMode::FallbackStorage => {
-                "描述你想找的意境，例如：秋夜思乡但不太悲伤"
-            }
-            _ => "AI 未配置时，会自动使用本地诗库进行意境匹配",
-        }
-    }
-
-    fn recommendation_rows(&self, poems: &[Poem]) -> Vec<RecommendationRow> {
-        let lookup = poems
+    fn discovery_rows(&self) -> Vec<DiscoveryResultRow> {
+        self.discovery_results
             .iter()
-            .map(|poem| (poem.id.as_str(), poem))
-            .collect::<std::collections::HashMap<_, _>>();
-        let items = if self.recommendations.is_empty() {
-            curated_recommendations(poems, 3)
-        } else {
-            self.recommendations.clone()
-        };
-
-        items
-            .into_iter()
-            .filter_map(|item| {
-                let poem = lookup.get(item.poem_id.as_str())?;
-                Some(RecommendationRow {
-                    id: poem.id.clone().into(),
-                    title: poem.title.clone().into(),
-                    meta: poem.metadata().into(),
-                    reason: soft_wrap(&item.reason, 18).into(),
-                })
+            .map(|item| DiscoveryResultRow {
+                id: item.id.clone().into(),
+                title: item.poem.title.clone().into(),
+                author: item.poem.author.clone().into(),
+                dynasty: item.poem.dynasty.clone().into(),
+                snippet: soft_wrap(&item.poem.snippet(), 18).into(),
+                reason: soft_wrap(&item.poem.match_reason, 20).into(),
+                relevance: item.poem.relevance_percent().into(),
             })
             .collect()
     }
 
     fn visible_poems(&self, poems: &[Poem]) -> Vec<Poem> {
-        if self.filter == FilterKind::Recommended && !self.recommendations.is_empty() {
-            let lookup = poems
-                .iter()
-                .map(|poem| (poem.id.as_str(), poem.clone()))
-                .collect::<std::collections::HashMap<_, _>>();
-            let mut recommended = self
-                .recommendations
-                .iter()
-                .filter_map(|item| lookup.get(item.poem_id.as_str()).cloned())
+        let normalized_query = self.local_search_query.trim().to_lowercase();
+        if !normalized_query.is_empty() {
+            let tokens = normalized_query
+                .split_whitespace()
+                .filter(|token| !token.is_empty())
                 .collect::<Vec<_>>();
-            recommended.truncate(12);
-            if !recommended.is_empty() {
-                return recommended;
-            }
+            return poems
+                .iter()
+                .filter(|poem| {
+                    let haystack =
+                        format!("{} {} {}", poem.title, poem.author, poem.content).to_lowercase();
+                    haystack.contains(&normalized_query)
+                        || tokens.iter().all(|token| haystack.contains(token))
+                })
+                .cloned()
+                .collect();
         }
 
         let mut filtered = match self.filter {
@@ -563,60 +607,99 @@ impl AppController {
         filtered
     }
 
-    fn spawn_discover(controller: Arc<Mutex<Self>>, weak: slint::Weak<AppWindow>, query: String) {
+    fn import_discovery(&mut self, item_id: &str, app: &AppWindow) -> Result<()> {
+        let Some(index) = self
+            .discovery_results
+            .iter()
+            .position(|item| item.id == item_id)
+        else {
+            return Ok(());
+        };
+        let item = self.discovery_results[index].clone();
+
+        let new_poem_id = self.db.insert_imported_poem(&item.poem)?;
+        self.discovery_results.remove(index);
+        self.filter = FilterKind::Recommended;
+        self.local_search_query.clear();
+        self.selected_poem_id = Some(new_poem_id);
+        self.discovery_status.clear();
+        self.toast_message = format!("已添加《{}》到诗库", item.poem.title);
+        self.toast_visible = true;
+        self.render(app)
+    }
+
+    fn spawn_discovery_search(
+        controller: Arc<Mutex<Self>>,
+        weak: slint::Weak<AppWindow>,
+        query: String,
+    ) {
         {
             let mut ctrl = controller.lock().unwrap();
-            ctrl.ai_busy = true;
-            ctrl.discover_query = query.clone();
+            ctrl.discovery_busy = true;
+            ctrl.discovery_query = query.clone();
+            ctrl.discovery_status.clear();
+            if query.trim().is_empty() {
+                ctrl.discovery_busy = false;
+                ctrl.discovery_results.clear();
+                ctrl.discovery_status = "请输入一个关键词、片段或意境描述。".to_string();
+            }
             if let Some(window) = weak.upgrade() {
                 let _ = ctrl.render(&window);
             }
         }
 
-        let (settings, poems, secret) = {
+        if query.trim().is_empty() {
+            return;
+        }
+
+        let (settings, secret) = {
             let ctrl = controller.lock().unwrap();
-            let poems = ctrl.db.list_poems().unwrap_or_default();
             let (secret, _) = ctrl.current_secret();
-            (ctrl.ai_config.settings.clone(), poems, secret)
+            (ctrl.ai_config.settings.clone(), secret)
         };
 
         std::thread::spawn(move || {
-            let known_ids = poems
-                .iter()
-                .map(|poem| poem.id.clone())
-                .collect::<HashSet<_>>();
-            let fallback = discover_locally(&query, &poems, 3);
-            let resolution = if let Some(secret) = secret.clone() {
+            let result: Result<Vec<PendingDiscoveryResult>, String> = if let Some(secret) = secret {
                 let client = OpenAiCompatibleClient::new(HttpAiTransport::new(
                     settings.clone(),
                     Some(secret),
                 ));
-                let candidates = poems
-                    .iter()
-                    .take(10)
-                    .map(PoemCandidate::from)
-                    .collect::<Vec<_>>();
-                let prompt = build_recommendation_prompt(&query, &candidates);
-                resolve_recommendations(client.recommend(&prompt), &known_ids, fallback)
+                let prompt = build_discovery_prompt(&query);
+                client
+                    .discover(&prompt)
+                    .map(|payload| {
+                        payload
+                            .poems
+                            .into_iter()
+                            .enumerate()
+                            .map(|(index, poem)| PendingDiscoveryResult {
+                                id: format!("discovery-{index}"),
+                                poem,
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                    .map_err(|err| format!("AI 搜索失败：{err:?}"))
             } else {
-                RecommendationResolution {
-                    source: crate::services::normalization::RecommendationSource::LocalFallback,
-                    recommendations: fallback,
-                    discarded_ids: Vec::new(),
-                    valid_ratio: 0.0,
-                    fallback_reason: Some(
-                        crate::services::normalization::FallbackReason::Unconfigured,
-                    ),
-                }
+                Err("AI 未配置，请先在 AI 设置中配置可用的模型与 API Key。".to_string())
             };
 
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(window) = weak.upgrade() {
                     let mut ctrl = controller.lock().unwrap();
-                    ctrl.ai_busy = false;
-                    ctrl.recommendations = resolution.recommendations.clone();
-                    if let Some(first) = ctrl.recommendations.first() {
-                        ctrl.selected_poem_id = Some(first.poem_id.clone());
+                    ctrl.discovery_busy = false;
+                    match result {
+                        Ok(items) => {
+                            ctrl.discovery_results = items;
+                            ctrl.discovery_status = if ctrl.discovery_results.is_empty() {
+                                "AI 没有返回可用诗词，请换个关键词再试。".to_string()
+                            } else {
+                                String::new()
+                            };
+                        }
+                        Err(message) => {
+                            ctrl.discovery_results.clear();
+                            ctrl.discovery_status = message;
+                        }
                     }
                     let _ = ctrl.render(&window);
                 }
@@ -683,17 +766,12 @@ impl AppController {
                 if let Some(window) = weak.upgrade() {
                     let mut ctrl = controller.lock().unwrap();
                     ctrl.ai_busy = false;
-                    match result {
-                        Ok(appreciation) => {
-                            ctrl.analysis_poem_id = Some(poem_id.clone());
-                            ctrl.analysis_text = appreciation.display_text();
-                            let _ = ctrl.db.save_cached_analysis(
-                                &poem_id,
-                                &appreciation,
-                                &settings.model,
-                            );
-                        }
-                        Err(_) => {}
+                    if let Ok(appreciation) = result {
+                        ctrl.analysis_poem_id = Some(poem_id.clone());
+                        ctrl.analysis_text = appreciation.display_text();
+                        let _ =
+                            ctrl.db
+                                .save_cached_analysis(&poem_id, &appreciation, &settings.model);
                     }
                     let _ = ctrl.render(&window);
                 }

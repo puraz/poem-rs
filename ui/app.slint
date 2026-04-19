@@ -10,11 +10,14 @@ export struct PoemRow {
     favorite: bool,
 }
 
-export struct RecommendationRow {
+export struct DiscoveryResultRow {
     id: string,
     title: string,
-    meta: string,
+    author: string,
+    dynasty: string,
+    snippet: string,
     reason: string,
+    relevance: string,
 }
 
 component TintedIcon inherits Image {
@@ -150,8 +153,8 @@ component CardIconAction inherits Rectangle {
     border-width: 1px;
 
     TintedIcon {
-        x: 10px;
-        y: 10px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
         width: 18px;
         height: 18px;
         source: root.icon;
@@ -168,6 +171,7 @@ component SearchField inherits Rectangle {
     in property <string> placeholder-text;
     out property <bool> has-focus: editor.has-focus;
     callback accepted();
+    forward-focus: editor;
 
     border-radius: 18px;
     background: #FBF8F2;
@@ -222,6 +226,7 @@ component InputField inherits Rectangle {
     in property <string> placeholder-text;
     out property <bool> has-focus: editor.has-focus;
     callback accepted();
+    forward-focus: editor;
 
     border-radius: 14px;
     background: #FBF8F2;
@@ -390,6 +395,89 @@ component PoemListCard inherits Rectangle {
     }
 }
 
+component DiscoveryResultCard inherits Rectangle {
+    in property <string> title;
+    in property <string> author;
+    in property <string> dynasty;
+    in property <string> snippet;
+    in property <string> reason;
+    in property <string> relevance;
+    callback add-clicked();
+
+    height: 176px;
+    border-radius: 18px;
+    background: touch.pressed ? #F2E8D9 : (touch.has-hover ? #FFFDF8 : #FCFAF6);
+    border-color: touch.pressed ? #C7A97A : (touch.has-hover ? #D0BA9C : #E4D9CC);
+    border-width: 1px;
+    clip: true;
+    drop-shadow-blur: touch.has-hover ? 14px : 8px;
+    drop-shadow-color: touch.has-hover ? rgba(72, 54, 32, 0.12) : rgba(72, 54, 32, 0.08);
+
+    touch := TouchArea {}
+
+    Text {
+        x: 18px;
+        y: 18px;
+        width: parent.width - 86px;
+        text: root.title;
+        color: #1F1B16;
+        font-size: 17px;
+        font-weight: 700;
+        wrap: word-wrap;
+    }
+
+    Text {
+        x: 18px;
+        y: 48px;
+        text: root.author + (root.dynasty == "" ? "" : (" · " + root.dynasty));
+        color: #6C6257;
+        font-size: 12px;
+    }
+
+    Text {
+        x: parent.width - 78px;
+        y: 20px;
+        width: 54px;
+        horizontal-alignment: right;
+        text: root.relevance;
+        color: #8B6B3F;
+        font-size: 12px;
+        font-weight: 700;
+    }
+
+    addAction := CardIconAction {
+        x: parent.width - 56px;
+        y: 52px;
+        width: 34px;
+        height: 34px;
+        icon: @image-url("../assets/icons/plus.svg");
+        icon-color: #8B6B3F;
+        clicked => { root.add-clicked(); }
+    }
+
+    Text {
+        x: 18px;
+        y: 78px;
+        width: parent.width - 86px;
+        height: 40px;
+        text: root.snippet;
+        color: #4E463E;
+        font-size: 13px;
+        wrap: word-wrap;
+    }
+
+    Text {
+        x: 18px;
+        y: 126px;
+        width: parent.width - 36px;
+        height: 34px;
+        text: root.reason;
+        color: #6C6257;
+        font-size: 12px;
+        wrap: word-wrap;
+    }
+}
+
 export component AppWindow inherits Window {
     title: "诗词收藏";
     width: 1200px;
@@ -413,7 +501,7 @@ export component AppWindow inherits Window {
     }
 
     in-out property <[PoemRow]> poem_rows;
-    in-out property <[RecommendationRow]> recommendation_rows;
+    in-out property <[DiscoveryResultRow]> discovery_rows;
     in-out property <string> section_title;
     in-out property <string> poem_count;
     in-out property <string> selected_poem_id;
@@ -426,8 +514,12 @@ export component AppWindow inherits Window {
     in-out property <string> analysis_text;
     in-out property <string> ai_mode_label;
     in-out property <bool> ai_busy;
-    in-out property <string> discover_query;
-    in-out property <string> discover_placeholder;
+    in-out property <string> local_search_query;
+    in-out property <string> discovery_query;
+    in-out property <bool> discovery_busy;
+    in-out property <string> discovery_status;
+    in-out property <string> toast_message;
+    in-out property <bool> toast_visible;
     in-out property <string> ai_base_url;
     in-out property <string> ai_model;
     in-out property <bool> allow_file_fallback;
@@ -435,14 +527,28 @@ export component AppWindow inherits Window {
 
     property <string> sidebar_view: "home";
     property <string> inspector_view: "detail";
+    property <bool> discovery_popup_open: false;
+    property <bool> discovery_status_visible: root.discovery_busy || !root.discovery_status.is-empty;
 
     callback select_filter(string);
     callback select_poem(string);
     callback toggle_favorite(string);
-    callback run_discover(string);
+    callback run_local_search(string);
+    callback run_discovery_search(string);
+    callback import_discovery(string);
     callback request_appreciation(string);
+    callback dismiss_toast();
     callback save_ai_settings(string, string, string, bool);
     callback clear_ai_key();
+
+    mainLayer := Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        background: transparent;
+        opacity: root.discovery_popup_open ? 0.94 : 1;
+        animate opacity { duration: 140ms; easing: ease-in-out; }
 
     Rectangle {
         x: 16px;
@@ -458,12 +564,13 @@ export component AppWindow inherits Window {
             x: 16px;
             y: 16px;
             width: parent.width - 32px;
-            text: root.ai_busy ? "正在发现…" : "发现新诗词";
+            text: "发现新诗词";
             clicked => {
                 root.sidebar_view = "home";
                 root.inspector_view = "detail";
                 root.select_filter("recommended");
-                root.run_discover(root.discover_query);
+                root.discovery_popup_open = true;
+                discoverySearchInput.focus();
             }
         }
 
@@ -558,9 +665,9 @@ export component AppWindow inherits Window {
             y: 0;
             width: parent.width;
             height: 56px;
-            text <=> root.discover_query;
-            placeholder-text: root.discover_placeholder;
-            accepted => { root.run_discover(root.discover_query); }
+            text <=> root.local_search_query;
+            placeholder-text: "搜索本地诗词：标题、作者、内容";
+            accepted => { root.run_local_search(root.local_search_query); }
         }
 
         Text {
@@ -577,10 +684,12 @@ export component AppWindow inherits Window {
             y: 118px;
             width: 86px;
             text: "全部";
-            active: root.section_title == "首页" || root.section_title == "推荐诗库" || root.section_title == "发现结果";
+            active: root.section_title == "首页" || root.section_title == "推荐诗库" || root.section_title == "本地搜索结果";
             clicked => {
                 root.sidebar_view = "home";
                 root.inspector_view = "detail";
+                root.local_search_query = "";
+                root.run_local_search("");
                 root.select_filter("recommended");
             }
         }
@@ -594,6 +703,8 @@ export component AppWindow inherits Window {
             clicked => {
                 root.sidebar_view = "home";
                 root.inspector_view = "detail";
+                root.local_search_query = "";
+                root.run_local_search("");
                 root.select_filter("tang");
             }
         }
@@ -607,6 +718,8 @@ export component AppWindow inherits Window {
             clicked => {
                 root.sidebar_view = "home";
                 root.inspector_view = "detail";
+                root.local_search_query = "";
+                root.run_local_search("");
                 root.select_filter("song");
             }
         }
@@ -620,6 +733,8 @@ export component AppWindow inherits Window {
             clicked => {
                 root.sidebar_view = "home";
                 root.inspector_view = "detail";
+                root.local_search_query = "";
+                root.run_local_search("");
                 root.select_filter("random");
             }
         }
@@ -1015,35 +1130,259 @@ export component AppWindow inherits Window {
                 }
             }
         }
+    }
 
-        fab := Rectangle {
-            x: parent.width - 70px;
-            y: parent.height - 70px;
-            width: 54px;
-            height: 54px;
-            border-radius: 27px;
-            background: fabTouch.pressed ? #E2D4BF : (fabTouch.has-hover ? #EFE4D4 : #E6DDCF);
-            border-color: fabTouch.pressed ? #9D6D1F : (fabTouch.has-hover ? #A97D37 : #B78A3D);
+    fab := Rectangle {
+        x: parent.width - 70px;
+        y: parent.height - 70px;
+        width: 54px;
+        height: 54px;
+        border-radius: 27px;
+        background: fabTouch.pressed ? #E2D4BF : (fabTouch.has-hover ? #EFE4D4 : #E6DDCF);
+        border-color: fabTouch.pressed ? #9D6D1F : (fabTouch.has-hover ? #A97D37 : #B78A3D);
+        border-width: 1px;
+
+        Text {
+            text: "+";
+            width: parent.width;
+            height: parent.height;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            color: fabTouch.pressed ? #7A591F : #8B6B3F;
+            font-size: 26px;
+            font-weight: 700;
+        }
+
+        fabTouch := TouchArea {
+            clicked => {
+                if (!root.ai_busy) {
+                    root.request_appreciation(root.selected_poem_id);
+                }
+            }
+        }
+    }
+
+    }
+
+    modalLayer := Rectangle {
+        x: 0;
+        y: 0;
+        width: parent.width;
+        height: parent.height;
+        background: root.discovery_popup_open ? rgba(68, 54, 38, 0.18) : transparent;
+        opacity: root.discovery_popup_open ? 1 : 0;
+        animate opacity { duration: 140ms; easing: ease-in-out; }
+
+        TouchArea {
+            width: parent.width;
+            height: parent.height;
+            enabled: root.discovery_popup_open;
+            clicked => {
+                root.discovery_popup_open = false;
+                blurSink.focus();
+            }
+        }
+
+        discoverPopup := Rectangle {
+            x: (parent.width - self.width) / 2;
+            y: root.discovery_popup_open ? 86px : 104px;
+            width: 600px;
+            height: 560px;
+            border-radius: 26px;
+            background: #FCF8F1;
+            border-color: #DACDBD;
             border-width: 1px;
+            drop-shadow-blur: 30px;
+            drop-shadow-color: rgba(56, 42, 27, 0.22);
+            opacity: root.discovery_popup_open ? 1 : 0;
+            animate y { duration: 160ms; easing: ease-out; }
+            animate opacity { duration: 120ms; easing: ease-in-out; }
 
-            Text {
-                text: "+";
+            TouchArea {
                 width: parent.width;
                 height: parent.height;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-                color: fabTouch.pressed ? #7A591F : #8B6B3F;
-                font-size: 26px;
-                font-weight: 700;
+                enabled: root.discovery_popup_open;
             }
 
-            fabTouch := TouchArea {
-                clicked => {
-                    if (!root.ai_busy) {
-                        root.request_appreciation(root.selected_poem_id);
+            Rectangle {
+                x: 20px;
+                y: 20px;
+                width: parent.width - 40px;
+                height: 104px;
+                border-radius: 20px;
+                background: #FBF8F2;
+                border-color: #E4D8CA;
+                border-width: 1px;
+
+                Text {
+                    x: 20px;
+                    y: 18px;
+                    text: "发现新诗词";
+                    color: #1F1B16;
+                    font-size: 22px;
+                    font-weight: 700;
+                }
+
+                discoverySearchInput := SearchField {
+                    x: 20px;
+                    y: 50px;
+                    width: parent.width - 132px;
+                    height: 46px;
+                    text <=> root.discovery_query;
+                    placeholder-text: "输入关键词、片段或意境";
+                    accepted => { root.run_discovery_search(root.discovery_query); }
+                }
+
+                searchButton := ActionButton {
+                    x: parent.width - 100px;
+                    y: 50px;
+                    width: 80px;
+                    height: 46px;
+                    text: root.discovery_busy ? "搜索中" : "搜索";
+                    enabled: !root.discovery_busy;
+                    clicked => { root.run_discovery_search(root.discovery_query); }
+                }
+            }
+
+            if root.discovery_status_visible : Rectangle {
+                x: 20px;
+                y: 136px;
+                width: parent.width - 40px;
+                height: 38px;
+                border-radius: 14px;
+                background: #F7F1E7;
+                border-color: #E5D8C6;
+                border-width: 1px;
+
+                if root.discovery_busy : Text {
+                    x: 14px;
+                    y: 0;
+                    width: parent.width - 28px;
+                    height: parent.height;
+                    text: "AI 正在搜索最匹配的诗词…";
+                    color: #8B6B3F;
+                    font-size: 13px;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
+                }
+
+                if !root.discovery_busy && !root.discovery_status.is-empty : Text {
+                    x: 14px;
+                    y: 0;
+                    width: parent.width - 28px;
+                    height: parent.height;
+                    text: root.discovery_status;
+                    color: #8B6B3F;
+                    font-size: 13px;
+                    vertical-alignment: center;
+                    wrap: word-wrap;
+                }
+
+            }
+
+            Rectangle {
+                x: 20px;
+                y: root.discovery_status_visible ? 188px : 136px;
+                width: parent.width - 40px;
+                height: root.discovery_status_visible ? parent.height - 272px : parent.height - 220px;
+                border-radius: 22px;
+                background: #F8F3EA;
+                border-color: #DED2C2;
+                border-width: 1px;
+                drop-shadow-blur: 8px;
+                drop-shadow-color: rgba(78, 59, 33, 0.08);
+
+                Rectangle {
+                    x: 12px;
+                    y: 12px;
+                    width: parent.width - 24px;
+                    height: parent.height - 24px;
+                    border-radius: 18px;
+                    background: #FDFBF7;
+                    border-color: #E8DED1;
+                    border-width: 1px;
+
+                    ListView {
+                        x: 12px;
+                        y: 12px;
+                        width: parent.width - 24px;
+                        height: parent.height - 24px;
+                        horizontal-scrollbar-policy: always-off;
+
+                        for item[index] in root.discovery_rows : Rectangle {
+                            width: parent.width;
+                            height: 192px;
+                            background: transparent;
+
+                            DiscoveryResultCard {
+                                x: 2px;
+                                y: 4px;
+                                width: parent.width - 4px;
+                                title: item.title;
+                                author: item.author;
+                                dynasty: item.dynasty;
+                                snippet: item.snippet;
+                                reason: item.reason;
+                                relevance: item.relevance;
+                                add-clicked => { root.import_discovery(item.id); }
+                            }
+                        }
                     }
                 }
             }
+
+            closeButton := ActionButton {
+                x: parent.width - 112px;
+                y: parent.height - 64px;
+                width: 92px;
+                height: 44px;
+                text: "关闭";
+                clicked => {
+                    root.discovery_popup_open = false;
+                    blurSink.focus();
+                }
+            }
+        }
+    }
+
+    if root.toast_visible : Rectangle {
+        x: (parent.width - self.width) / 2;
+        y: parent.height - 92px;
+        width: 360px;
+        height: 52px;
+        border-radius: 18px;
+        background: #2F261E;
+        border-color: rgba(255, 248, 238, 0.18);
+        border-width: 1px;
+        drop-shadow-blur: 18px;
+        drop-shadow-color: rgba(35, 24, 15, 0.28);
+        opacity: root.toast_visible ? 1 : 0;
+        animate opacity { duration: 120ms; easing: ease-in-out; }
+
+        TintedIcon {
+            x: 18px;
+            y: 16px;
+            width: 20px;
+            height: 20px;
+            source: @image-url("../assets/icons/check.svg");
+            tint: #EADCC8;
+        }
+
+        Text {
+            x: 50px;
+            y: 0;
+            width: parent.width - 76px;
+            height: parent.height;
+            text: root.toast_message;
+            color: #FFF8ED;
+            font-size: 13px;
+            font-weight: 600;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
+        TouchArea {
+            clicked => { root.dismiss_toast(); }
         }
     }
 }

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::config::ai::AiSettings;
-use crate::domain::{AiAppreciation, Poem};
+use crate::domain::{AiAppreciation, DiscoveredPoem, Poem};
 
 const MANIFEST_JSON: &str = include_str!("../../assets/poetry/manifest.json");
 const CORPUS_JSON: &str = include_str!("../../assets/poetry/corpus.json");
@@ -206,6 +206,39 @@ impl AppDatabase {
         Ok(())
     }
 
+    pub fn insert_imported_poem(&self, poem: &DiscoveredPoem) -> Result<String> {
+        let conn = self.connect()?;
+        let poem_id = unique_import_id(poem);
+        let checksum = checksum_hex(
+            format!(
+                "{}\n{}\n{}\n{}",
+                poem.title, poem.author, poem.dynasty, poem.content
+            )
+            .as_bytes(),
+        );
+
+        conn.execute(
+            r#"
+            INSERT INTO poems(id, title, author, dynasty, content, tags_json, source, license, checksum, seed_version)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            "#,
+            params![
+                poem_id.as_str(),
+                poem.title.as_str(),
+                poem.author.as_str(),
+                poem.dynasty.as_str(),
+                poem.content.as_str(),
+                serde_json::to_string(&Vec::<String>::new())?,
+                "AI 发现导入",
+                "Unknown / AI Provided",
+                checksum,
+                0_i64,
+            ],
+        )?;
+
+        Ok(poem_id)
+    }
+
     pub fn poetry_snapshot(&self) -> Result<PoetrySnapshot> {
         Ok(PoetrySnapshot {
             poems: self.list_poems()?,
@@ -385,6 +418,21 @@ fn checksum_hex(bytes: &[u8]) -> String {
     format!("{digest:x}")
 }
 
+fn unique_import_id(poem: &DiscoveredPoem) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let checksum = checksum_hex(
+        format!(
+            "{}|{}|{}|{}|{}",
+            poem.title, poem.author, poem.dynasty, poem.content, nanos
+        )
+        .as_bytes(),
+    );
+    format!("ai::{nanos}::{}", &checksum[..12])
+}
+
 #[derive(Debug, Deserialize)]
 struct SeedManifest {
     seed_version: i64,
@@ -462,6 +510,41 @@ mod tests {
             db.load_window_geometry().expect("load window geometry"),
             Some(geometry)
         );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn imported_poems_allow_duplicate_content_with_new_ids() {
+        let path = temp_db_path("import-duplicates");
+        let db = AppDatabase::new(&path);
+        db.bootstrap().expect("bootstrap");
+
+        let poem = DiscoveredPoem {
+            title: "登高".into(),
+            content: "风急天高猿啸哀，\n渚清沙白鸟飞回。".into(),
+            author: "杜甫".into(),
+            dynasty: "唐".into(),
+            category: String::new(),
+            notes: String::new(),
+            relevance_score: 0.98,
+            match_reason: "高度匹配".into(),
+            is_recommendation: true,
+        };
+
+        let first_id = db.insert_imported_poem(&poem).expect("first import");
+        let second_id = db.insert_imported_poem(&poem).expect("second import");
+
+        assert_ne!(first_id, second_id);
+
+        let imported = db
+            .list_poems()
+            .expect("poems")
+            .into_iter()
+            .filter(|item| item.title == poem.title && item.author == poem.author)
+            .collect::<Vec<_>>();
+        assert!(imported.len() >= 2);
+        assert!(imported.iter().any(|item| item.id == first_id));
+        assert!(imported.iter().any(|item| item.id == second_id));
         let _ = std::fs::remove_file(path);
     }
 }

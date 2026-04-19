@@ -5,7 +5,7 @@ use serde_json::Value;
 use std::time::Duration;
 
 use crate::config::ai::AiSettings;
-use crate::domain::{AiAppreciation, AiRecommendation, PoemCandidate};
+use crate::domain::{AiAppreciation, AiRecommendation, DiscoveredPoem, PoemCandidate};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecommendationPrompt {
@@ -28,6 +28,16 @@ pub struct RecommendationPayload {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiscoveryPrompt {
+    pub query: String,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct DiscoveryPayload {
+    pub poems: Vec<DiscoveredPoem>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum AiTransportError {
     Unconfigured,
     Timeout,
@@ -36,6 +46,7 @@ pub enum AiTransportError {
 }
 
 pub trait AiTransport {
+    fn discover(&self, request: &DiscoveryPrompt) -> Result<DiscoveryPayload, AiTransportError>;
     fn recommend(
         &self,
         request: &RecommendationPrompt,
@@ -58,6 +69,13 @@ impl<T> OpenAiCompatibleClient<T>
 where
     T: AiTransport,
 {
+    pub fn discover(
+        &self,
+        request: &DiscoveryPrompt,
+    ) -> Result<DiscoveryPayload, AiTransportError> {
+        self.transport.discover(request)
+    }
+
     pub fn recommend(
         &self,
         request: &RecommendationPrompt,
@@ -149,6 +167,25 @@ impl HttpAiTransport {
 }
 
 impl AiTransport for HttpAiTransport {
+    fn discover(&self, request: &DiscoveryPrompt) -> Result<DiscoveryPayload, AiTransportError> {
+        let system_prompt = r#"你是一个专业的古诗词检索助手。用户可能会提供诗词片段、关键词、主题意境描述或模糊记忆。你的任务是理解用户搜索意图，找到最匹配的完整古诗词，并只返回 JSON 数组。
+
+返回要求：
+1. 只返回最外层 JSON 数组，不要 markdown 代码块，不要额外解释。
+2. 默认返回最推荐的 3 首古诗词。
+3. 每个对象必须包含字段：title, content, author, dynasty, category, notes, relevanceScore, matchReason, isRecommendation。
+4. title 不要带《》；dynasty 允许为空字符串；content 必须是完整诗词，并保留标点、换行和必要分段。
+5. 每句诗词单独成行；确实需要分段的长诗/乐府可使用空行分段。
+6. relevanceScore 取值范围 0.0 到 1.0；matchReason 需要具体解释与查询的关联。
+7. 优先返回与查询最相关、最完整、最可信的结果。"#;
+        let user_prompt = format!(
+            "基于我的搜索意图“{}”，请返回最匹配的 3 首古诗词。\n要求：\n- 返回完整准确的标题、作者、朝代、全文\n- content 中的换行使用 \\n 表示，段落之间使用 \\n\\n 表示\n- 结果必须可以被程序直接解析为 JSON 数组\n- isRecommendation 统一返回 true",
+            request.query
+        );
+        let content = self.post_chat(system_prompt, &user_prompt)?;
+        parse_discovery_content(&content)
+    }
+
     fn recommend(
         &self,
         request: &RecommendationPrompt,
@@ -225,6 +262,19 @@ fn parse_recommendation_content(content: &str) -> Result<RecommendationPayload, 
     Ok(RecommendationPayload { recommendations })
 }
 
+fn parse_discovery_content(content: &str) -> Result<DiscoveryPayload, AiTransportError> {
+    let value = parse_json_array(content)?;
+    let poems = serde_json::from_value::<Vec<DiscoveredPoem>>(value)
+        .map_err(|err| AiTransportError::Parse(err.to_string()))?;
+    let poems = poems.into_iter().take(3).collect::<Vec<_>>();
+    if poems.is_empty() {
+        return Err(AiTransportError::Parse(
+            "empty discovery result array".to_string(),
+        ));
+    }
+    Ok(DiscoveryPayload { poems })
+}
+
 fn parse_appreciation_content(content: &str) -> Result<AiAppreciation, AiTransportError> {
     let value = parse_json_object(content)?;
     let poem_id = value
@@ -266,6 +316,24 @@ fn collect_string_array(value: &Value, key: &str) -> Result<Vec<String>, AiTrans
 }
 
 fn parse_json_object(content: &str) -> Result<Value, AiTransportError> {
+    let value = parse_json_value(content)?;
+    if value.is_object() {
+        Ok(value)
+    } else {
+        Err(AiTransportError::Parse("expected json object".into()))
+    }
+}
+
+fn parse_json_array(content: &str) -> Result<Value, AiTransportError> {
+    let value = parse_json_value(content)?;
+    if value.is_array() {
+        Ok(value)
+    } else {
+        Err(AiTransportError::Parse("expected json array".into()))
+    }
+}
+
+fn parse_json_value(content: &str) -> Result<Value, AiTransportError> {
     serde_json::from_str::<Value>(content)
         .or_else(|_| {
             extract_json_slice(content)
@@ -278,8 +346,13 @@ fn parse_json_object(content: &str) -> Result<Value, AiTransportError> {
 }
 
 fn extract_json_slice(content: &str) -> Option<&str> {
-    let start = content.find('{')?;
-    let end = content.rfind('}')?;
+    extract_json_slice_by_delimiters(content, '[', ']')
+        .or_else(|| extract_json_slice_by_delimiters(content, '{', '}'))
+}
+
+fn extract_json_slice_by_delimiters(content: &str, open: char, close: char) -> Option<&str> {
+    let start = content.find(open)?;
+    let end = content.rfind(close)?;
     (end > start).then_some(&content[start..=end])
 }
 
@@ -298,6 +371,12 @@ pub fn build_recommendation_prompt(
     RecommendationPrompt {
         user_prompt: query.trim().to_string(),
         candidates: candidates.to_vec(),
+    }
+}
+
+pub fn build_discovery_prompt(query: &str) -> DiscoveryPrompt {
+    DiscoveryPrompt {
+        query: query.trim().to_string(),
     }
 }
 
@@ -323,11 +402,19 @@ mod tests {
 
     #[derive(Clone)]
     struct StubTransport {
+        discovery: Result<DiscoveryPayload, AiTransportError>,
         recommendation: Result<RecommendationPayload, AiTransportError>,
         appreciation: Result<AiAppreciation, AiTransportError>,
     }
 
     impl AiTransport for StubTransport {
+        fn discover(
+            &self,
+            _request: &DiscoveryPrompt,
+        ) -> Result<DiscoveryPayload, AiTransportError> {
+            self.discovery.clone()
+        }
+
         fn recommend(
             &self,
             _request: &RecommendationPrompt,
@@ -346,6 +433,19 @@ mod tests {
     #[test]
     fn client_returns_transport_payloads() {
         let client = OpenAiCompatibleClient::new(StubTransport {
+            discovery: Ok(DiscoveryPayload {
+                poems: vec![DiscoveredPoem {
+                    title: "登高".into(),
+                    content: "风急天高猿啸哀，\n渚清沙白鸟飞回。".into(),
+                    author: "杜甫".into(),
+                    dynasty: "唐".into(),
+                    category: String::new(),
+                    notes: String::new(),
+                    relevance_score: 0.98,
+                    match_reason: "高度匹配".into(),
+                    is_recommendation: true,
+                }],
+            }),
             recommendation: Ok(RecommendationPayload {
                 recommendations: vec![AiRecommendation::new(
                     "poem-1",
@@ -361,6 +461,13 @@ mod tests {
                 "- imagery",
             )),
         });
+
+        let discovered = client
+            .discover(&DiscoveryPrompt {
+                query: "登高".into(),
+            })
+            .expect("discover");
+        assert_eq!(discovered.poems[0].title, "登高");
 
         let recommendations = client
             .recommend(&RecommendationPrompt {
@@ -391,9 +498,19 @@ mod tests {
     #[test]
     fn client_preserves_timeout_failures() {
         let client = OpenAiCompatibleClient::new(StubTransport {
+            discovery: Err(AiTransportError::Timeout),
             recommendation: Err(AiTransportError::Timeout),
             appreciation: Err(AiTransportError::Unconfigured),
         });
+
+        assert_eq!(
+            client
+                .discover(&DiscoveryPrompt {
+                    query: "request".into(),
+                })
+                .expect_err("timeout expected"),
+            AiTransportError::Timeout
+        );
 
         assert_eq!(
             client
@@ -413,6 +530,25 @@ mod tests {
         )
         .expect("parse recommendations");
         assert_eq!(payload.recommendations[0].poem_id, "poem-1");
+    }
+
+    #[test]
+    fn parses_discovery_array_json() {
+        let payload = parse_discovery_content(
+            r#"[{"title":"登高","content":"风急天高猿啸哀，\n渚清沙白鸟飞回。","author":"杜甫","dynasty":"唐","category":"","notes":"","relevanceScore":0.99,"matchReason":"与登高主题完全匹配","isRecommendation":true}]"#,
+        )
+        .expect("parse discovery");
+        assert_eq!(payload.poems[0].title, "登高");
+        assert_eq!(payload.poems[0].relevance_percent(), "99%");
+    }
+
+    #[test]
+    fn extracts_discovery_array_from_fenced_output() {
+        let payload = parse_discovery_content(
+            "```json\n[{\"title\":\"春晓\",\"content\":\"春眠不觉晓，\\n处处闻啼鸟。\",\"author\":\"孟浩然\",\"dynasty\":\"唐\",\"category\":\"\",\"notes\":\"\",\"relevanceScore\":0.91,\"matchReason\":\"春景匹配\",\"isRecommendation\":true}]\n```",
+        )
+        .expect("parse fenced discovery");
+        assert_eq!(payload.poems[0].author, "孟浩然");
     }
 
     #[test]
