@@ -1192,6 +1192,7 @@ export component AppWindow inherits Window {
         y: 0;
         width: parent.width;
         height: parent.height;
+        visible: root.discovery_popup_open;
         background: root.discovery_popup_open ? rgba(68, 54, 38, 0.18) : transparent;
         opacity: root.discovery_popup_open ? 1 : 0;
         animate opacity { duration: 140ms; easing: ease-in-out; }
