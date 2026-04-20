@@ -641,7 +641,7 @@ impl AppController {
             if query.trim().is_empty() {
                 ctrl.discovery_busy = false;
                 ctrl.discovery_results.clear();
-                ctrl.discovery_status = "请输入一个关键词、片段或意境描述。".to_string();
+                ctrl.discovery_status.clear();
             }
             if let Some(window) = weak.upgrade() {
                 let _ = ctrl.render(&window);

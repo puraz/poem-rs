@@ -31,8 +31,8 @@ component SidebarPrimaryAction inherits Rectangle {
     in property <string> text;
     callback clicked();
 
-    height: 56px;
-    border-radius: 14px;
+    height: 30px;
+    border-radius: 13px;
     background: touch.pressed ? #E2D4BF : (touch.has-hover ? #EFE4D4 : #E6DDCF);
     border-color: touch.pressed ? #9D6D1F : (touch.has-hover ? #A97D37 : #B78A3D);
     border-width: 1px;
@@ -40,7 +40,7 @@ component SidebarPrimaryAction inherits Rectangle {
 
     TintedIcon {
         x: 16px;
-        y: 16px;
+        y: (parent.height - self.height) / 2;
         width: 22px;
         height: 22px;
         source: @image-url("../assets/icons/discover.svg");
@@ -576,7 +576,7 @@ export component AppWindow inherits Window {
 
         homeNav := SidebarNavItem {
             x: 16px;
-            y: 92px;
+            y: 82px;
             width: parent.width - 32px;
             icon: @image-url("../assets/icons/home.svg");
             text: "首页";
@@ -591,7 +591,7 @@ export component AppWindow inherits Window {
 
         favoritesNav := SidebarNavItem {
             x: 16px;
-            y: 156px;
+            y: 126px;
             width: parent.width - 32px;
             icon: @image-url("../assets/icons/favorite-filled.svg");
             text: "收藏夹";
@@ -606,7 +606,7 @@ export component AppWindow inherits Window {
 
         aboutNav := SidebarNavItem {
             x: 16px;
-            y: 220px;
+            y: 200px;
             width: parent.width - 32px;
             icon: @image-url("../assets/icons/about.svg");
             text: "关于";
@@ -1204,55 +1204,43 @@ export component AppWindow inherits Window {
                 enabled: root.discovery_popup_open;
             }
 
-            Rectangle {
-                x: 20px;
-                y: 20px;
-                width: parent.width - 40px;
-                height: 104px;
-                border-radius: 20px;
-                background: #FBF8F2;
-                border-color: #E4D8CA;
-                border-width: 1px;
+            Text {
+                x: 40px;
+                y: 36px;
+                text: "发现新诗词";
+                color: #1F1B16;
+                font-size: 22px;
+                font-weight: 700;
+            }
 
-                Text {
-                    x: 20px;
-                    y: 18px;
-                    text: "发现新诗词";
-                    color: #1F1B16;
-                    font-size: 22px;
-                    font-weight: 700;
-                }
+            discoverySearchInput := SearchField {
+                x: 40px;
+                y: 76px;
+                width: parent.width - 160px;
+                height: 48px;
+                text <=> root.discovery_query;
+                placeholder-text: "输入关键词、片段或意境";
+                accepted => { root.run_discovery_search(root.discovery_query); }
+            }
 
-                discoverySearchInput := SearchField {
-                    x: 20px;
-                    y: 50px;
-                    width: parent.width - 132px;
-                    height: 46px;
-                    text <=> root.discovery_query;
-                    placeholder-text: "输入关键词、片段或意境";
-                    accepted => { root.run_discovery_search(root.discovery_query); }
-                }
-
-                searchButton := ActionButton {
-                    x: parent.width - 100px;
-                    y: 50px;
-                    width: 80px;
-                    height: 46px;
-                    text: root.discovery_busy ? "搜索中" : "搜索";
-                    enabled: !root.discovery_busy;
-                    clicked => { root.run_discovery_search(root.discovery_query); }
-                }
+            searchButton := ActionButton {
+                x: parent.width - 108px;
+                y: 76px;
+                width: 68px;
+                height: 48px;
+                text: root.discovery_busy ? "搜索中" : "搜索";
+                enabled: !root.discovery_busy;
+                clicked => { root.run_discovery_search(root.discovery_query); }
             }
 
             if root.discovery_status_visible : Rectangle {
-                x: 20px;
-                y: 136px;
-                width: parent.width - 40px;
+                x: 40px;
+                y: 140px;
+                width: parent.width - 80px;
                 height: 38px;
                 border-radius: 14px;
                 background: #F7F1E7;
-                border-color: #E5D8C6;
-                border-width: 1px;
+                border-width: 0px;
 
                 if root.discovery_busy : Text {
                     x: 14px;
@@ -1281,51 +1269,51 @@ export component AppWindow inherits Window {
             }
 
             Rectangle {
-                x: 20px;
-                y: root.discovery_status_visible ? 188px : 136px;
-                width: parent.width - 40px;
-                height: root.discovery_status_visible ? parent.height - 272px : parent.height - 220px;
+                x: 40px;
+                y: root.discovery_status_visible ? 192px : 144px;
+                width: parent.width - 80px;
+                height: root.discovery_status_visible ? parent.height - 276px : parent.height - 228px;
                 border-radius: 22px;
-                background: #F8F3EA;
-                border-color: #DED2C2;
-                border-width: 1px;
-                drop-shadow-blur: 8px;
-                drop-shadow-color: rgba(78, 59, 33, 0.08);
+                background: #FDFBF7;
+                border-width: 0px;
+                clip: true;
 
-                Rectangle {
-                    x: 12px;
-                    y: 12px;
-                    width: parent.width - 24px;
-                    height: parent.height - 24px;
-                    border-radius: 18px;
-                    background: #FDFBF7;
-                    border-color: #E8DED1;
-                    border-width: 1px;
+                if !root.discovery_busy && root.discovery_rows.length == 0 : Text {
+                    x: 0;
+                    y: 0;
+                    width: parent.width;
+                    height: parent.height;
+                    text: "请输入关键词";
+                    color: #9A8F82;
+                    font-size: 15px;
+                    font-weight: 600;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
 
-                    ListView {
-                        x: 12px;
-                        y: 12px;
-                        width: parent.width - 24px;
-                        height: parent.height - 24px;
-                        horizontal-scrollbar-policy: always-off;
+                ListView {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: parent.height;
+                    horizontal-scrollbar-policy: always-off;
 
-                        for item[index] in root.discovery_rows : Rectangle {
-                            width: parent.width;
-                            height: 192px;
-                            background: transparent;
+                    for item[index] in root.discovery_rows : Rectangle {
+                        width: parent.width;
+                        height: 192px;
+                        background: transparent;
 
-                            DiscoveryResultCard {
-                                x: 2px;
-                                y: 4px;
-                                width: parent.width - 4px;
-                                title: item.title;
-                                author: item.author;
-                                dynasty: item.dynasty;
-                                snippet: item.snippet;
-                                reason: item.reason;
-                                relevance: item.relevance;
-                                add-clicked => { root.import_discovery(item.id); }
-                            }
+                        DiscoveryResultCard {
+                            x: 2px;
+                            y: 4px;
+                            width: parent.width - 4px;
+                            title: item.title;
+                            author: item.author;
+                            dynasty: item.dynasty;
+                            snippet: item.snippet;
+                            reason: item.reason;
+                            relevance: item.relevance;
+                            add-clicked => { root.import_discovery(item.id); }
                         }
                     }
                 }
