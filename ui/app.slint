@@ -31,8 +31,8 @@ component SidebarPrimaryAction inherits Rectangle {
     in property <string> text;
     callback clicked();
 
-    height: 30px;
-    border-radius: 13px;
+    height: 52px;
+    border-radius: 14px;
     background: touch.pressed ? #E2D4BF : (touch.has-hover ? #EFE4D4 : #E6DDCF);
     border-color: touch.pressed ? #9D6D1F : (touch.has-hover ? #A97D37 : #B78A3D);
     border-width: 1px;
@@ -509,7 +509,6 @@ export component AppWindow inherits Window {
     in-out property <string> selected_meta;
     in-out property <string> selected_tags;
     in-out property <string> selected_content;
-    in-out property <string> selected_source;
     in-out property <bool> selected_favorite;
     in-out property <string> analysis_text;
     in-out property <string> ai_mode_label;
@@ -576,7 +575,7 @@ export component AppWindow inherits Window {
 
         homeNav := SidebarNavItem {
             x: 16px;
-            y: 82px;
+            y: 88px;
             width: parent.width - 32px;
             icon: @image-url("../assets/icons/home.svg");
             text: "首页";
@@ -591,7 +590,7 @@ export component AppWindow inherits Window {
 
         favoritesNav := SidebarNavItem {
             x: 16px;
-            y: 126px;
+            y: 152px;
             width: parent.width - 32px;
             icon: @image-url("../assets/icons/favorite-filled.svg");
             text: "收藏夹";
@@ -606,7 +605,7 @@ export component AppWindow inherits Window {
 
         aboutNav := SidebarNavItem {
             x: 16px;
-            y: 200px;
+            y: 216px;
             width: parent.width - 32px;
             icon: @image-url("../assets/icons/about.svg");
             text: "关于";
@@ -924,14 +923,6 @@ export component AppWindow inherits Window {
                         background: #E8DED1;
                         vertical-stretch: 0;
                     }
-                }
-
-                Text {
-                    text: root.selected_source;
-                    color: #8B8074;
-                    font-size: 11px;
-                    wrap: word-wrap;
-                    vertical-stretch: 0;
                 }
 
                 Rectangle {

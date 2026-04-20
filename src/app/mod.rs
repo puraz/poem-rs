@@ -420,7 +420,6 @@ impl AppController {
             app.set_selected_meta(poem.metadata().into());
             app.set_selected_tags(poem.tags_summary().into());
             app.set_selected_content(poem.content.clone().into());
-            app.set_selected_source(format!("{} · {}", poem.source, poem.license).into());
             app.set_selected_favorite(poem.is_favorite);
         } else {
             app.set_selected_poem_id(SharedString::default());
@@ -428,7 +427,6 @@ impl AppController {
             app.set_selected_meta(SharedString::default());
             app.set_selected_tags(SharedString::default());
             app.set_selected_content("当前筛选条件下没有可展示的诗词。".into());
-            app.set_selected_source(SharedString::default());
             app.set_selected_favorite(false);
         }
 
