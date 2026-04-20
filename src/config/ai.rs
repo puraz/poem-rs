@@ -10,7 +10,7 @@ use keyring_core::Entry;
 
 pub const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 pub const DEFAULT_MODEL: &str = "gpt-4.1-mini";
-pub const DEFAULT_TIMEOUT_SECS: u64 = 20;
+pub const DEFAULT_TIMEOUT_SECS: u64 = 120;
 pub const SECRET_FILE_NAME: &str = "ai-secret.toml";
 pub const FILE_FALLBACK_WARNING: &str =
     "API key file fallback is less secure than keyring storage and should require explicit opt-in.";
@@ -62,6 +62,10 @@ impl Default for AiSettings {
 }
 
 impl AiSettings {
+    pub fn effective_timeout_secs(&self) -> u64 {
+        self.timeout_secs.max(DEFAULT_TIMEOUT_SECS)
+    }
+
     pub fn mode_for(&self, has_secret: bool, persistence: SecretPersistencePlan) -> AiMode {
         let _ = self;
 
@@ -311,6 +315,16 @@ mod tests {
             settings.mode_for(false, SecretPersistencePlan::Unavailable),
             AiMode::Unavailable
         );
+    }
+
+    #[test]
+    fn timeout_never_drops_below_default() {
+        let mut settings = AiSettings::default();
+        settings.timeout_secs = DEFAULT_TIMEOUT_SECS - 1;
+        assert_eq!(settings.effective_timeout_secs(), DEFAULT_TIMEOUT_SECS);
+
+        settings.timeout_secs = DEFAULT_TIMEOUT_SECS + 30;
+        assert_eq!(settings.effective_timeout_secs(), DEFAULT_TIMEOUT_SECS + 30);
     }
 
     #[test]

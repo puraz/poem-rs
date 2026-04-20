@@ -16,6 +16,7 @@ export struct DiscoveryResultRow {
     author: string,
     dynasty: string,
     snippet: string,
+    snippet_centered: bool,
     reason: string,
     relevance: string,
 }
@@ -400,11 +401,14 @@ component DiscoveryResultCard inherits Rectangle {
     in property <string> author;
     in property <string> dynasty;
     in property <string> snippet;
+    in property <bool> snippet_centered;
     in property <string> reason;
     in property <string> relevance;
     callback add-clicked();
 
-    height: 176px;
+    height: self.preferred-height;
+    preferred-height: reasonText.y + reasonText.preferred-height + 18px;
+    min-height: self.preferred-height;
     border-radius: 18px;
     background: touch.pressed ? #F2E8D9 : (touch.has-hover ? #FFFDF8 : #FCFAF6);
     border-color: touch.pressed ? #C7A97A : (touch.has-hover ? #D0BA9C : #E4D9CC);
@@ -415,10 +419,10 @@ component DiscoveryResultCard inherits Rectangle {
 
     touch := TouchArea {}
 
-    Text {
+    titleText := Text {
         x: 18px;
         y: 18px;
-        width: parent.width - 86px;
+        width: parent.width - 110px;
         text: root.title;
         color: #1F1B16;
         font-size: 17px;
@@ -426,28 +430,41 @@ component DiscoveryResultCard inherits Rectangle {
         wrap: word-wrap;
     }
 
-    Text {
+    metaText := Text {
         x: 18px;
-        y: 48px;
+        y: titleText.y + titleText.preferred-height + 6px;
+        width: parent.width - 110px;
         text: root.author + (root.dynasty == "" ? "" : (" · " + root.dynasty));
         color: #6C6257;
         font-size: 12px;
+        wrap: word-wrap;
     }
 
-    Text {
-        x: parent.width - 78px;
-        y: 20px;
-        width: 54px;
-        horizontal-alignment: right;
-        text: root.relevance;
-        color: #8B6B3F;
-        font-size: 12px;
-        font-weight: 700;
+    relevanceBadge := Rectangle {
+        x: parent.width - 84px;
+        y: 18px;
+        width: 60px;
+        height: 26px;
+        border-radius: 13px;
+        background: #F4ECDD;
+        border-color: #E2D2B5;
+        border-width: 1px;
+
+        Text {
+            width: parent.width;
+            height: parent.height;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            text: root.relevance;
+            color: #8B6B3F;
+            font-size: 12px;
+            font-weight: 700;
+        }
     }
 
     addAction := CardIconAction {
         x: parent.width - 56px;
-        y: 52px;
+        y: 72px;
         width: 34px;
         height: 34px;
         icon: @image-url("../assets/icons/plus.svg");
@@ -455,22 +472,36 @@ component DiscoveryResultCard inherits Rectangle {
         clicked => { root.add-clicked(); }
     }
 
-    Text {
+    poemBody := Rectangle {
         x: 18px;
-        y: 78px;
-        width: parent.width - 86px;
-        height: 40px;
-        text: root.snippet;
-        color: #4E463E;
-        font-size: 13px;
-        wrap: word-wrap;
+        y: metaText.y + metaText.preferred-height + 14px;
+        width: parent.width - 110px;
+        height: max(88px, poemText.preferred-height + 24px);
+        border-radius: 14px;
+        background: touch.has-hover ? #FBF5EA : #F8F1E5;
+        border-color: touch.has-hover ? #E0CFB3 : #E8DDCE;
+        border-width: 1px;
+        clip: true;
+
+        poemText := Text {
+            x: 14px;
+            y: root.snippet_centered ? max(12px, (poemBody.height - self.preferred-height) / 2) : 12px;
+            width: parent.width - 28px;
+            height: self.preferred-height;
+            text: root.snippet;
+            color: #433A31;
+            font-size: 14px;
+            font-weight: 500;
+            horizontal-alignment: root.snippet_centered ? center : left;
+            wrap: word-wrap;
+        }
     }
 
-    Text {
+    reasonText := Text {
         x: 18px;
-        y: 126px;
+        y: poemBody.y + poemBody.height + 12px;
         width: parent.width - 36px;
-        height: 34px;
+        height: self.preferred-height;
         text: root.reason;
         color: #6C6257;
         font-size: 12px;
@@ -655,7 +686,7 @@ export component AppWindow inherits Window {
     Rectangle {
         x: 252px;
         y: 16px;
-        width: 600px;
+        width: 540px;
         height: parent.height - 32px;
         background: transparent;
 
@@ -788,9 +819,9 @@ export component AppWindow inherits Window {
     }
 
     Rectangle {
-        x: 868px;
+        x: 808px;
         y: 16px;
-        width: 316px;
+        width: 376px;
         height: parent.height - 32px;
         border-radius: 22px;
         background: #FBF8F2;
@@ -1291,10 +1322,10 @@ export component AppWindow inherits Window {
 
                     for item[index] in root.discovery_rows : Rectangle {
                         width: parent.width;
-                        height: 192px;
+                        height: card.preferred-height + 16px;
                         background: transparent;
 
-                        DiscoveryResultCard {
+                        card := DiscoveryResultCard {
                             x: 2px;
                             y: 4px;
                             width: parent.width - 4px;
@@ -1302,6 +1333,7 @@ export component AppWindow inherits Window {
                             author: item.author;
                             dynasty: item.dynasty;
                             snippet: item.snippet;
+                            snippet_centered: item.snippet_centered;
                             reason: item.reason;
                             relevance: item.relevance;
                             add-clicked => { root.import_discovery(item.id); }

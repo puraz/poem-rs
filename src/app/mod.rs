@@ -547,14 +547,18 @@ impl AppController {
     fn discovery_rows(&self) -> Vec<DiscoveryResultRow> {
         self.discovery_results
             .iter()
-            .map(|item| DiscoveryResultRow {
-                id: item.id.clone().into(),
-                title: item.poem.title.clone().into(),
-                author: item.poem.author.clone().into(),
-                dynasty: item.poem.dynasty.clone().into(),
-                snippet: soft_wrap(&item.poem.snippet(), 18).into(),
-                reason: soft_wrap(&item.poem.match_reason, 20).into(),
-                relevance: item.poem.relevance_percent().into(),
+            .map(|item| {
+                let excerpt = discovery_poem_excerpt(&item.poem.content);
+                DiscoveryResultRow {
+                    id: item.id.clone().into(),
+                    title: item.poem.title.clone().into(),
+                    author: item.poem.author.clone().into(),
+                    dynasty: item.poem.dynasty.clone().into(),
+                    snippet: excerpt.text.into(),
+                    snippet_centered: excerpt.centered,
+                    reason: format!("匹配：{}", item.poem.match_reason).into(),
+                    relevance: item.poem.relevance_percent().into(),
+                }
             })
             .collect()
     }
@@ -801,6 +805,67 @@ fn soft_wrap(input: &str, width: usize) -> String {
     out
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DiscoveryPoemExcerpt {
+    text: String,
+    centered: bool,
+}
+
+fn discovery_poem_excerpt(content: &str) -> DiscoveryPoemExcerpt {
+    const MAX_LINES: usize = 4;
+    const CENTER_MAX_CHARS_PER_LINE: usize = 16;
+    const LEFT_WRAP_WIDTH: usize = 18;
+
+    let mut lines = content
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .take(MAX_LINES + 1)
+        .map(ToOwned::to_owned)
+        .collect::<Vec<_>>();
+
+    if lines.is_empty() {
+        return DiscoveryPoemExcerpt {
+            text: "（暂无诗句）".to_string(),
+            centered: true,
+        };
+    }
+
+    let truncated = lines.len() > MAX_LINES;
+    lines.truncate(MAX_LINES);
+
+    let centered = lines
+        .iter()
+        .all(|line| poetry_line_char_count(line) <= CENTER_MAX_CHARS_PER_LINE);
+
+    if truncated && let Some(last) = lines.last_mut() {
+        append_poetry_ellipsis(last);
+    }
+
+    let text = if centered {
+        lines.join("\n")
+    } else {
+        soft_wrap(&lines.join("\n"), LEFT_WRAP_WIDTH)
+    };
+
+    DiscoveryPoemExcerpt { text, centered }
+}
+
+fn poetry_line_char_count(line: &str) -> usize {
+    line.chars()
+        .filter(|ch| !ch.is_whitespace() && !matches!(ch, '，' | '。' | '？' | '！' | '；' | '、'))
+        .count()
+}
+
+fn append_poetry_ellipsis(line: &mut String) {
+    while line.ends_with(|ch: char| {
+        ch.is_whitespace() || matches!(ch, '，' | '。' | '？' | '！' | '；' | '、')
+    }) {
+        line.pop();
+    }
+    line.push('…');
+}
+
 fn poem_to_row(poem: &Poem) -> PoemRow {
     PoemRow {
         id: poem.id.clone().into(),
@@ -814,5 +879,45 @@ fn poem_to_row(poem: &Poem) -> PoemRow {
             "收藏".into()
         },
         favorite: poem.is_favorite,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{discovery_poem_excerpt, soft_wrap};
+
+    #[test]
+    fn discovery_excerpt_preserves_short_poem_lines_centered() {
+        let excerpt = discovery_poem_excerpt("春眠不觉晓\n处处闻啼鸟\n夜来风雨声\n花落知多少");
+
+        assert!(excerpt.centered);
+        assert_eq!(
+            excerpt.text,
+            "春眠不觉晓\n处处闻啼鸟\n夜来风雨声\n花落知多少"
+        );
+    }
+
+    #[test]
+    fn discovery_excerpt_truncates_long_poems_cleanly() {
+        let excerpt = discovery_poem_excerpt("一行\n二行\n三行\n四行。\n五行");
+
+        assert!(excerpt.centered);
+        assert_eq!(excerpt.text, "一行\n二行\n三行\n四行…");
+    }
+
+    #[test]
+    fn discovery_excerpt_left_aligns_long_lines() {
+        let excerpt = discovery_poem_excerpt(
+            "这是一句明显超过短诗展示宽度的长句需要保留可读性\n第二句也很长很长不适合强制居中",
+        );
+
+        assert!(!excerpt.centered);
+        assert_eq!(
+            excerpt.text,
+            soft_wrap(
+                "这是一句明显超过短诗展示宽度的长句需要保留可读性\n第二句也很长很长不适合强制居中",
+                18,
+            )
+        );
     }
 }

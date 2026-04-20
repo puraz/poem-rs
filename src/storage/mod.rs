@@ -136,7 +136,8 @@ impl AppDatabase {
                 timeout_secs: values
                     .get("ai.timeout_secs")
                     .and_then(|v| v.parse::<u64>().ok())
-                    .unwrap_or(AiSettings::default().timeout_secs),
+                    .unwrap_or(AiSettings::default().timeout_secs)
+                    .max(AiSettings::default().timeout_secs),
             },
             allow_file_fallback: values
                 .get("ai.allow_file_fallback")
@@ -510,6 +511,25 @@ mod tests {
             db.load_window_geometry().expect("load window geometry"),
             Some(geometry)
         );
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn ai_timeout_uses_current_default_as_minimum() {
+        let path = temp_db_path("ai-timeout");
+        let db = AppDatabase::new(&path);
+        db.bootstrap().expect("bootstrap");
+
+        let mut config = db.load_ai_config().expect("load ai config");
+        config.settings.timeout_secs = 20;
+        db.save_ai_config(&config).expect("save old timeout");
+
+        let loaded = db.load_ai_config().expect("reload ai config");
+        assert_eq!(
+            loaded.settings.timeout_secs,
+            AiSettings::default().timeout_secs
+        );
+
         let _ = std::fs::remove_file(path);
     }
 

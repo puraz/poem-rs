@@ -104,7 +104,7 @@ impl HttpAiTransport {
 
     fn client(&self) -> Result<Client, AiTransportError> {
         Client::builder()
-            .timeout(Duration::from_secs(self.settings.timeout_secs))
+            .timeout(Duration::from_secs(self.settings.effective_timeout_secs()))
             .build()
             .map_err(|err| AiTransportError::Transport(err.to_string()))
     }
