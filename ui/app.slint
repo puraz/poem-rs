@@ -485,14 +485,14 @@ component DiscoveryResultCard inherits Rectangle {
 
         poemText := Text {
             x: 14px;
-            y: root.snippet_centered ? max(12px, (poemBody.height - self.preferred-height) / 2) : 12px;
+            y: root.snippet_centered ? (parent.height - self.preferred-height) / 2 : 12px;
             width: parent.width - 28px;
-            height: self.preferred-height;
             text: root.snippet;
             color: #433A31;
             font-size: 14px;
             font-weight: 500;
             horizontal-alignment: root.snippet_centered ? center : left;
+            vertical-alignment: root.snippet_centered ? center : top;
             wrap: word-wrap;
         }
     }
@@ -557,7 +557,7 @@ export component AppWindow inherits Window {
 
     property <string> sidebar_view: "home";
     property <string> inspector_view: "detail";
-    property <bool> discovery_popup_open: false;
+    in-out property <bool> discovery_popup_open: false;
     property <bool> discovery_status_visible: root.discovery_busy || !root.discovery_status.is-empty;
 
     callback select_filter(string);
@@ -788,6 +788,7 @@ export component AppWindow inherits Window {
             background: #FBF8F2;
             border-color: #DDD4C8;
             border-width: 1px;
+            clip: true;
 
             ListView {
                 x: 14px;
@@ -1357,7 +1358,7 @@ export component AppWindow inherits Window {
     }
 
     if root.toast_visible : Rectangle {
-        x: (parent.width - self.width) / 2;
+        x: parent.width - self.width - 24px;
         y: parent.height - 92px;
         width: 360px;
         height: 52px;

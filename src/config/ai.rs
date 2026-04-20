@@ -319,8 +319,10 @@ mod tests {
 
     #[test]
     fn timeout_never_drops_below_default() {
-        let mut settings = AiSettings::default();
-        settings.timeout_secs = DEFAULT_TIMEOUT_SECS - 1;
+        let mut settings = AiSettings {
+            timeout_secs: DEFAULT_TIMEOUT_SECS - 1,
+            ..AiSettings::default()
+        };
         assert_eq!(settings.effective_timeout_secs(), DEFAULT_TIMEOUT_SECS);
 
         settings.timeout_secs = DEFAULT_TIMEOUT_SECS + 30;

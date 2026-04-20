@@ -59,6 +59,40 @@ struct PendingDiscoveryResult {
     poem: DiscoveredPoem,
 }
 
+#[derive(Clone, Debug, Default)]
+struct ToastState {
+    message: String,
+    visible: bool,
+    revision: u64,
+}
+
+impl ToastState {
+    fn show(&mut self, message: impl Into<String>) -> u64 {
+        self.message = message.into();
+        self.visible = true;
+        self.revision = self.revision.wrapping_add(1);
+        self.revision
+    }
+
+    fn dismiss(&mut self) -> bool {
+        if !self.visible {
+            return false;
+        }
+
+        self.visible = false;
+        self.revision = self.revision.wrapping_add(1);
+        true
+    }
+
+    fn dismiss_if_current(&mut self, expected_revision: u64) -> bool {
+        if self.visible && self.revision == expected_revision {
+            return self.dismiss();
+        }
+
+        false
+    }
+}
+
 pub fn run() -> Result<()> {
     stderr_filter::install_known_warning_filter();
     let env_filter = EnvFilter::try_from_default_env()
@@ -252,21 +286,23 @@ fn bind_callbacks(app: &AppWindow, controller: Arc<Mutex<AppController>>) {
     let weak = app.as_weak();
     let ctrl = controller.clone();
     app.on_import_discovery(move |item_id| {
-        if let Some(window) = weak.upgrade()
-            && ctrl
+        if let Some(window) = weak.upgrade() {
+            let toast_revision = ctrl
                 .lock()
                 .unwrap()
                 .import_discovery(item_id.as_str(), &window)
-                .is_ok()
-        {
-            schedule_toast_dismiss(weak.clone());
+                .ok();
+            if let Some(Some(toast_revision)) = toast_revision {
+                schedule_toast_dismiss(ctrl.clone(), weak.clone(), toast_revision);
+            }
         }
     });
 
     let weak = app.as_weak();
+    let ctrl = controller.clone();
     app.on_dismiss_toast(move || {
         if let Some(window) = weak.upgrade() {
-            window.set_toast_visible(false);
+            let _ = ctrl.lock().unwrap().dismiss_toast(&window);
         }
     });
 
@@ -299,10 +335,17 @@ fn bind_callbacks(app: &AppWindow, controller: Arc<Mutex<AppController>>) {
     });
 }
 
-fn schedule_toast_dismiss(weak: slint::Weak<AppWindow>) {
+fn schedule_toast_dismiss(
+    controller: Arc<Mutex<AppController>>,
+    weak: slint::Weak<AppWindow>,
+    toast_revision: u64,
+) {
     slint::Timer::single_shot(Duration::from_secs(2), move || {
         if let Some(window) = weak.upgrade() {
-            window.set_toast_visible(false);
+            let _ = controller
+                .lock()
+                .unwrap()
+                .dismiss_toast_if_current(toast_revision, &window);
         }
     });
 }
@@ -319,8 +362,7 @@ struct AppController {
     discovery_busy: bool,
     discovery_status: String,
     discovery_results: Vec<PendingDiscoveryResult>,
-    toast_message: String,
-    toast_visible: bool,
+    toast: ToastState,
     analysis_poem_id: Option<String>,
     analysis_text: String,
 }
@@ -341,8 +383,7 @@ impl AppController {
             discovery_busy: false,
             discovery_status: String::new(),
             discovery_results: Vec::new(),
-            toast_message: String::new(),
-            toast_visible: false,
+            toast: ToastState::default(),
             analysis_poem_id: None,
             analysis_text: String::new(),
         })
@@ -393,8 +434,8 @@ impl AppController {
         app.set_discovery_query(self.discovery_query.clone().into());
         app.set_discovery_busy(self.discovery_busy);
         app.set_discovery_status(self.discovery_status.clone().into());
-        app.set_toast_message(self.toast_message.clone().into());
-        app.set_toast_visible(self.toast_visible);
+        app.set_toast_message(self.toast.message.clone().into());
+        app.set_toast_visible(self.toast.visible);
         app.set_analysis_text(soft_wrap(&self.analysis_text, 22).into());
         app.set_ai_base_url(self.ai_config.settings.base_url.clone().into());
         app.set_ai_model(self.ai_config.settings.model.clone().into());
@@ -454,6 +495,22 @@ impl AppController {
     fn toggle_favorite(&mut self, poem_id: &str, app: &AppWindow) -> Result<()> {
         self.db.toggle_favorite(poem_id)?;
         self.render(app)
+    }
+
+    fn dismiss_toast(&mut self, app: &AppWindow) -> Result<()> {
+        if self.toast.dismiss() {
+            self.render(app)?;
+        }
+
+        Ok(())
+    }
+
+    fn dismiss_toast_if_current(&mut self, expected_revision: u64, app: &AppWindow) -> Result<()> {
+        if self.toast.dismiss_if_current(expected_revision) {
+            self.render(app)?;
+        }
+
+        Ok(())
     }
 
     fn save_ai_settings(
@@ -582,7 +639,7 @@ impl AppController {
                 .collect();
         }
 
-        let mut filtered = match self.filter {
+        match self.filter {
             FilterKind::Recommended => poems.to_vec(),
             FilterKind::Favorites => poems
                 .iter()
@@ -604,18 +661,16 @@ impl AppController {
                 rev.reverse();
                 rev
             }
-        };
-        filtered.truncate(12);
-        filtered
+        }
     }
 
-    fn import_discovery(&mut self, item_id: &str, app: &AppWindow) -> Result<()> {
+    fn import_discovery(&mut self, item_id: &str, app: &AppWindow) -> Result<Option<u64>> {
         let Some(index) = self
             .discovery_results
             .iter()
             .position(|item| item.id == item_id)
         else {
-            return Ok(());
+            return Ok(None);
         };
         let item = self.discovery_results[index].clone();
 
@@ -625,9 +680,12 @@ impl AppController {
         self.local_search_query.clear();
         self.selected_poem_id = Some(new_poem_id);
         self.discovery_status.clear();
-        self.toast_message = format!("已添加《{}》到诗库", item.poem.title);
-        self.toast_visible = true;
-        self.render(app)
+        let toast_revision = self
+            .toast
+            .show(format!("已添加《{}》到诗库", item.poem.title));
+        app.set_discovery_popup_open(false);
+        self.render(app)?;
+        Ok(Some(toast_revision))
     }
 
     fn spawn_discovery_search(
@@ -884,7 +942,7 @@ fn poem_to_row(poem: &Poem) -> PoemRow {
 
 #[cfg(test)]
 mod tests {
-    use super::{discovery_poem_excerpt, soft_wrap};
+    use super::{ToastState, discovery_poem_excerpt, soft_wrap};
 
     #[test]
     fn discovery_excerpt_preserves_short_poem_lines_centered() {
@@ -919,5 +977,20 @@ mod tests {
                 18,
             )
         );
+    }
+
+    #[test]
+    fn toast_dismiss_ignores_stale_revision() {
+        let mut toast = ToastState::default();
+
+        let first = toast.show("第一次");
+        let second = toast.show("第二次");
+
+        assert!(toast.visible);
+        assert_eq!(toast.message, "第二次");
+        assert!(!toast.dismiss_if_current(first));
+        assert!(toast.visible);
+        assert!(toast.dismiss_if_current(second));
+        assert!(!toast.visible);
     }
 }

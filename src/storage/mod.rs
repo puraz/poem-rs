@@ -63,7 +63,7 @@ impl AppDatabase {
             SELECT p.id, p.title, p.author, p.dynasty, p.content, p.tags_json, p.source, p.license,
                    EXISTS(SELECT 1 FROM favorites f WHERE f.poem_id = p.id) AS is_favorite
             FROM poems p
-            ORDER BY p.dynasty, p.author, p.title
+            ORDER BY CAST(p.created_at AS INTEGER) DESC, p.rowid DESC, p.title
             "#,
         )?;
 
@@ -220,8 +220,11 @@ impl AppDatabase {
 
         conn.execute(
             r#"
-            INSERT INTO poems(id, title, author, dynasty, content, tags_json, source, license, checksum, seed_version)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            INSERT INTO poems(
+                id, title, author, dynasty, content, tags_json, source, license, checksum,
+                seed_version, created_at
+            )
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
             "#,
             params![
                 poem_id.as_str(),
@@ -234,6 +237,7 @@ impl AppDatabase {
                 "Unknown / AI Provided",
                 checksum,
                 0_i64,
+                now_string(),
             ],
         )?;
 
@@ -268,7 +272,8 @@ impl AppDatabase {
                 source TEXT NOT NULL,
                 license TEXT NOT NULL,
                 checksum TEXT NOT NULL,
-                seed_version INTEGER NOT NULL
+                seed_version INTEGER NOT NULL,
+                created_at TEXT NOT NULL DEFAULT '0'
             );
             CREATE TABLE IF NOT EXISTS favorites (
                 poem_id TEXT PRIMARY KEY REFERENCES poems(id) ON DELETE CASCADE,
@@ -286,6 +291,7 @@ impl AppDatabase {
             );
             "#,
         )?;
+        self.ensure_poem_created_at_column(conn)?;
         Ok(())
     }
 
@@ -321,8 +327,11 @@ impl AppDatabase {
         {
             let mut stmt = tx.prepare(
                 r#"
-                INSERT INTO poems(id, title, author, dynasty, content, tags_json, source, license, checksum, seed_version)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                INSERT INTO poems(
+                    id, title, author, dynasty, content, tags_json, source, license, checksum,
+                    seed_version, created_at
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
                 ON CONFLICT(id) DO UPDATE SET
                     title = excluded.title,
                     author = excluded.author,
@@ -335,7 +344,7 @@ impl AppDatabase {
                     seed_version = excluded.seed_version
                 "#,
             )?;
-            for poem in seed_poems {
+            for (index, poem) in seed_poems.into_iter().enumerate() {
                 let content = poem.lines.join("\n");
                 let checksum = checksum_hex(content.as_bytes());
                 stmt.execute(params![
@@ -349,6 +358,7 @@ impl AppDatabase {
                     poem.license,
                     checksum,
                     manifest.seed_version,
+                    seed_created_at(index),
                 ])?;
             }
         }
@@ -365,6 +375,28 @@ impl AppDatabase {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
         })?;
         Ok(rows.collect::<rusqlite::Result<HashMap<_, _>>>()?)
+    }
+
+    fn ensure_poem_created_at_column(&self, conn: &Connection) -> Result<()> {
+        let mut stmt = conn.prepare("PRAGMA table_info(poems)")?;
+        let columns = stmt.query_map([], |row| row.get::<_, String>(1))?;
+        let has_created_at = columns
+            .collect::<rusqlite::Result<Vec<_>>>()?
+            .into_iter()
+            .any(|name| name == "created_at");
+
+        if !has_created_at {
+            conn.execute(
+                "ALTER TABLE poems ADD COLUMN created_at TEXT NOT NULL DEFAULT '0'",
+                [],
+            )?;
+        }
+
+        conn.execute(
+            "UPDATE poems SET created_at = CAST(rowid AS TEXT) WHERE created_at = '0'",
+            [],
+        )?;
+        Ok(())
     }
 
     fn get_meta(&self, conn: &Connection, key: &str) -> Result<Option<String>> {
@@ -412,6 +444,10 @@ fn now_string() -> String {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs().to_string())
         .unwrap_or_else(|_| "0".into())
+}
+
+fn seed_created_at(index: usize) -> String {
+    (index + 1).to_string()
 }
 
 fn checksum_hex(bytes: &[u8]) -> String {
@@ -565,6 +601,40 @@ mod tests {
         assert!(imported.len() >= 2);
         assert!(imported.iter().any(|item| item.id == first_id));
         assert!(imported.iter().any(|item| item.id == second_id));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn list_poems_returns_newest_imports_first() {
+        let path = temp_db_path("list-order");
+        let db = AppDatabase::new(&path);
+        db.bootstrap().expect("bootstrap");
+
+        let poem = DiscoveredPoem {
+            title: "新作".into(),
+            content: "第一版".into(),
+            author: "测试作者".into(),
+            dynasty: "今".into(),
+            category: String::new(),
+            notes: String::new(),
+            relevance_score: 0.9,
+            match_reason: "测试".into(),
+            is_recommendation: true,
+        };
+
+        let first_id = db.insert_imported_poem(&poem).expect("first import");
+        let second_id = db.insert_imported_poem(&poem).expect("second import");
+
+        let poems = db.list_poems().expect("list poems");
+        assert_eq!(
+            poems.first().map(|item| item.id.as_str()),
+            Some(second_id.as_str())
+        );
+        assert_eq!(
+            poems.get(1).map(|item| item.id.as_str()),
+            Some(first_id.as_str())
+        );
+
         let _ = std::fs::remove_file(path);
     }
 }
