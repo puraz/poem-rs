@@ -1,9 +1,7 @@
-slint::include_modules!();
-
-pub mod app;
 pub mod config;
 pub mod domain;
 pub mod services;
 pub mod storage;
+pub mod ui;
 
-pub use app::run;
+pub use ui::run;

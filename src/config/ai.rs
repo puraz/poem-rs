@@ -5,8 +5,7 @@ use std::path::{Path, PathBuf};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
-use keyring::use_native_store;
-use keyring_core::Entry;
+use keyring::Entry;
 
 pub const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 pub const DEFAULT_MODEL: &str = "gpt-4.1-mini";
@@ -152,7 +151,7 @@ pub struct KeyringSecretStore;
 
 impl KeyringSecretStore {
     pub fn is_available() -> bool {
-        use_native_store(false).is_ok()
+        Entry::new(KEYRING_SERVICE, KEYRING_USERNAME).is_ok()
     }
 
     pub fn save_api_key(&self, api_key: &str) -> io::Result<()> {
@@ -182,11 +181,11 @@ impl KeyringSecretStore {
     }
 }
 
-fn is_missing_credential(err: &keyring_core::Error) -> bool {
-    matches!(err, keyring_core::Error::NoEntry)
+fn is_missing_credential(err: &keyring::Error) -> bool {
+    matches!(err, keyring::Error::NoEntry)
 }
 
-fn map_keyring_error(err: keyring_core::Error) -> io::Error {
+fn map_keyring_error(err: keyring::Error) -> io::Error {
     io::Error::other(err.to_string())
 }
 
