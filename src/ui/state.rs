@@ -4,8 +4,9 @@ use crate::config::ai::{
 use crate::config::app::AppPaths;
 use crate::domain::{DiscoveredPoem, Poem};
 use crate::storage::StoredAiConfig;
+use iced::widget::text_editor;
 
-use super::message::{ContentMode, Modal, ThemeChoice};
+use super::message::{ContentMode, DetailTool, Modal, ThemeChoice};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ToastState {
@@ -102,13 +103,27 @@ impl SettingsForm {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct EditForm {
     pub poem_id: String,
     pub title: String,
     pub author: String,
     pub dynasty: String,
     pub content: String,
+    pub content_editor: text_editor::Content,
+}
+
+impl Default for EditForm {
+    fn default() -> Self {
+        Self {
+            poem_id: String::new(),
+            title: String::new(),
+            author: String::new(),
+            dynasty: String::new(),
+            content: String::new(),
+            content_editor: text_editor::Content::new(),
+        }
+    }
 }
 
 impl EditForm {
@@ -119,7 +134,13 @@ impl EditForm {
             author: poem.author.clone(),
             dynasty: poem.dynasty.clone(),
             content: poem.content.clone(),
+            content_editor: text_editor::Content::with_text(&poem.content),
         }
+    }
+
+    pub fn apply_content_action(&mut self, action: text_editor::Action) {
+        self.content_editor.perform(action);
+        self.content = self.content_editor.text();
     }
 }
 
@@ -172,6 +193,7 @@ pub struct AppState {
     pub active_theme: ThemeChoice,
     pub appreciation: AppreciationState,
     pub edit_form: Option<EditForm>,
+    pub hovered_detail_tool: Option<DetailTool>,
 }
 
 impl AppState {
@@ -196,6 +218,7 @@ impl AppState {
             active_theme,
             appreciation: AppreciationState::default(),
             edit_form: None,
+            hovered_detail_tool: None,
         }
     }
 

@@ -1,8 +1,8 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use iced::widget::{Space, button, column, container, mouse_area, row, text};
-use iced::{Alignment, Color, Element, Length, Size, Task, Theme, window};
+use iced::widget::{Space, button, column, container, mouse_area, row, scrollable, text};
+use iced::{Alignment, Color, Element, Length, Size, Task, Theme, alignment, mouse, window};
 use tracing_subscriber::EnvFilter;
 
 use crate::config::app::AppPaths;
@@ -11,7 +11,7 @@ use crate::storage::{AppDatabase, StoredAiConfig};
 use super::components::{
     SurfaceKind, ToastTone, modal_overlay, nav_surface, page_shell, surface, toast, toast_host,
 };
-use super::message::{ContentMode, Message, Modal, ThemeChoice};
+use super::message::{ContentMode, DetailTool, Message, Modal, ThemeChoice};
 use super::screens::{about_modal, discovery_modal, edit_modal, library, settings_modal};
 use super::state::{AppState, SettingsForm};
 use super::task;
@@ -291,10 +291,14 @@ impl PoemApp {
                 }
                 Task::none()
             }
-            Message::EditContentChanged(value) => {
+            Message::EditContentChanged(action) => {
                 if let Some(form) = &mut self.state.edit_form {
-                    form.content = value;
+                    form.apply_content_action(action);
                 }
+                Task::none()
+            }
+            Message::HoverDetailTool(tool) => {
+                self.state.hovered_detail_tool = tool;
                 Task::none()
             }
             Message::SaveEdit => {
@@ -555,61 +559,107 @@ impl PoemApp {
             .into();
         };
 
+        let favorite_hovered = self.state.hovered_detail_tool == Some(DetailTool::Favorite);
+        let is_light_theme = matches!(self.state.active_theme, ThemeChoice::Songyanjian);
         let favorite_icon = if poem.is_favorite {
             ICON_FAVORITE_FILLED
         } else {
             ICON_FAVORITE
         };
+        let favorite_tone = if poem.is_favorite && favorite_hovered && is_light_theme {
+            SidebarIconTone::Inverse
+        } else if poem.is_favorite {
+            SidebarIconTone::Accent
+        } else {
+            SidebarIconTone::Default
+        };
 
         let action_row = row![
             pane_title,
             Space::new().width(Length::Fill),
-            detail_icon_button(
+            detail_icon_action(
                 favorite_icon,
-                if poem.is_favorite {
-                    SidebarIconTone::Inverse
-                } else {
-                    SidebarIconTone::Default
-                },
-                poem.is_favorite
-            )
-            .on_press(Message::ToggleFavorite),
-            detail_icon_button(ICON_EDIT, SidebarIconTone::Default, false)
-                .on_press(Message::OpenEditModal),
-            detail_icon_button(ICON_APPRECIATION, SidebarIconTone::Default, false)
-                .on_press(Message::RequestAppreciation),
+                favorite_tone,
+                poem.is_favorite,
+                DetailTool::Favorite,
+                Message::ToggleFavorite
+            ),
+            detail_icon_action(
+                ICON_EDIT,
+                SidebarIconTone::Default,
+                false,
+                DetailTool::Edit,
+                Message::OpenEditModal,
+            ),
+            detail_icon_action(
+                ICON_APPRECIATION,
+                SidebarIconTone::Default,
+                false,
+                DetailTool::Appreciation,
+                Message::RequestAppreciation,
+            ),
         ]
         .spacing(12)
         .align_y(Alignment::Center);
 
-        let mut content = column![
-            action_row,
-            Space::new().height(Length::Fixed(18.0)),
-            container(text(poem.title.clone()).size(38)).style(theme::title_text),
-            container(text(poem.metadata()).size(17)).style(theme::subdued_text),
-            container(text(poem.content.clone()).size(24)).style(theme::title_text),
+        let mut reading_column = column![
+            container(
+                text(poem.title.clone())
+                    .size(38)
+                    .width(Length::Fill)
+                    .align_x(alignment::Horizontal::Center),
+            )
+            .style(theme::title_text),
+            container(
+                text(poem.metadata())
+                    .size(17)
+                    .width(Length::Fill)
+                    .align_x(alignment::Horizontal::Center),
+            )
+            .style(theme::subdued_text),
+            container(
+                text(poem.content.clone())
+                    .size(24)
+                    .width(Length::Fill)
+                    .align_x(alignment::Horizontal::Center),
+            )
+            .style(theme::title_text),
         ]
+        .align_x(Alignment::Center)
         .spacing(22);
 
         if self.state.appreciation.loading {
-            content = content.push(surface(text("正在生成赏析…").size(15), SurfaceKind::Accent));
+            reading_column = reading_column.push(surface(
+                text("正在生成赏析…").size(15),
+                SurfaceKind::Appreciation,
+            ));
         } else if !self.state.appreciation.error.is_empty() {
-            content = content.push(surface(
+            reading_column = reading_column.push(surface(
                 text(self.state.appreciation.error.clone()).size(15),
-                SurfaceKind::Accent,
+                SurfaceKind::Appreciation,
             ));
         } else if !self.state.appreciation.content.is_empty()
             && self.state.appreciation.poem_id.as_deref() == Some(poem.id.as_str())
         {
-            content = content.push(surface(
+            reading_column = reading_column.push(surface(
                 text(self.state.appreciation.content.clone()).size(16),
-                SurfaceKind::Accent,
+                SurfaceKind::Appreciation,
             ));
         }
 
+        let content = column![
+            action_row,
+            Space::new().height(Length::Fixed(28.0)),
+            container(reading_column)
+                .width(Length::Fill)
+                .max_width(620)
+                .center_x(Length::Fill),
+        ]
+        .spacing(0);
+
         row![
             content_vertical_divider::<Message>(),
-            container(content)
+            container(scrollable(content).height(Length::Fill))
                 .width(Length::Fill)
                 .height(Length::Fill)
                 .padding([28, 34])
@@ -777,26 +827,35 @@ fn sidebar_theme_button<'a>(
     })
 }
 
-fn detail_icon_button<'a>(
+fn detail_icon_action<'a>(
     icon_path: &'static str,
     icon_tone: SidebarIconTone,
     active: bool,
-) -> button::Button<'a, Message> {
-    button(
-        container(sidebar_icon::<Message>(icon_path, 20.0, icon_tone))
-            .width(Length::Fixed(20.0))
-            .height(Length::Fixed(20.0))
-            .center_x(Length::Shrink)
-            .center_y(Length::Shrink),
+    tool: DetailTool,
+    on_press: Message,
+) -> Element<'a, Message> {
+    mouse_area(
+        button(
+            container(sidebar_icon::<Message>(icon_path, 28.0, icon_tone))
+                .width(Length::Fixed(40.0))
+                .height(Length::Fixed(40.0))
+                .center_x(Length::Shrink)
+                .center_y(Length::Shrink),
+        )
+        .width(Length::Fixed(44.0))
+        .height(Length::Fixed(44.0))
+        .padding(0)
+        .style(if active {
+            theme::button_detail_icon_active
+        } else {
+            theme::button_detail_icon
+        })
+        .on_press(on_press),
     )
-    .width(Length::Fixed(48.0))
-    .height(Length::Fixed(48.0))
-    .padding(0)
-    .style(if active {
-        theme::button_detail_icon_active
-    } else {
-        theme::button_detail_icon
-    })
+    .on_enter(Message::HoverDetailTool(Some(tool)))
+    .on_exit(Message::HoverDetailTool(None))
+    .interaction(mouse::Interaction::Pointer)
+    .into()
 }
 
 fn sidebar_icon<'a, Message: 'a>(

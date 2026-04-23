@@ -58,18 +58,29 @@ pub fn modal_frame<'a, Message: 'a>(
     footer: Option<Element<'a, Message>>,
 ) -> Element<'a, Message> {
     let mut frame = widget::Column::new()
-        .spacing(f32::from(theme::SPACE_5))
-        .push(header)
-        .push(body);
+        .push(
+            widget::container(header)
+                .width(Length::Fill)
+                .padding([theme::SPACE_6, theme::SPACE_6]),
+        )
+        .push(modal_divider())
+        .push(
+            widget::container(body)
+                .width(Length::Fill)
+                .padding([theme::SPACE_5, theme::SPACE_6]),
+        );
 
     if let Some(footer) = footer {
-        frame = frame.push(widget::container(footer).padding(theme::SPACE_1));
+        frame = frame.push(modal_divider()).push(
+            widget::container(footer)
+                .width(Length::Fill)
+                .padding([theme::SPACE_5, theme::SPACE_6]),
+        );
     }
 
     widget::container(frame)
         .width(Length::Fill)
-        .max_width(820)
-        .padding(theme::SPACE_6)
+        .max_width(860)
         .style(theme::modal_frame)
         .into()
 }
@@ -103,4 +114,16 @@ pub fn modal_overlay<'a, Message: Clone + 'a>(
     };
 
     widget::Stack::with_children(vec![base.into(), overlay]).into()
+}
+
+fn modal_divider<'a, Message: 'a>() -> Element<'a, Message> {
+    widget::container(
+        widget::Space::new()
+            .width(Length::Fill)
+            .height(Length::Fixed(1.0)),
+    )
+    .width(Length::Fill)
+    .height(Length::Fixed(1.0))
+    .style(theme::content_divider)
+    .into()
 }

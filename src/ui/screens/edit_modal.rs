@@ -1,11 +1,12 @@
-use iced::widget::{Space, column, row, scrollable, text_input};
+use iced::widget::{Space, column, row, scrollable, text_editor};
 use iced::{Element, Length};
 
 use crate::ui::components::{
-    ButtonKind, action_button, field_input, input_block, modal_frame, modal_header_with_close,
+    ButtonKind, compact_button, field_input, input_block, modal_frame, modal_header_with_close,
 };
 use crate::ui::message::Message;
 use crate::ui::state::EditForm;
+use crate::ui::theme;
 
 pub fn view(form: &'_ EditForm) -> Element<'_, Message> {
     let author_meta = row![
@@ -28,11 +29,13 @@ pub fn view(form: &'_ EditForm) -> Element<'_, Message> {
         author_meta,
         input_block(
             "正文",
-            text_input("诗词正文", &form.content)
-                .on_input(Message::EditContentChanged)
+            text_editor(&form.content_editor)
+                .placeholder("诗词正文")
+                .on_action(Message::EditContentChanged)
                 .padding(16)
                 .size(18)
-                .width(Length::Fill),
+                .height(Length::Fixed(260.0))
+                .style(theme::text_editor_default),
         ),
     ]
     .spacing(20);
@@ -43,12 +46,12 @@ pub fn view(form: &'_ EditForm) -> Element<'_, Message> {
         Some(
             row![
                 Space::new().width(Length::Fill),
-                action_button("保存", ButtonKind::Primary)
-                    .width(128)
-                    .on_press(Message::SaveEdit),
-                action_button("取消", ButtonKind::Secondary)
-                    .width(112)
+                compact_button("取消", ButtonKind::Secondary)
+                    .width(108)
                     .on_press(Message::CloseModal),
+                compact_button("保存", ButtonKind::Primary)
+                    .width(116)
+                    .on_press(Message::SaveEdit),
             ]
             .spacing(12)
             .into(),

@@ -1,4 +1,5 @@
 use crate::domain::DiscoveredPoem;
+use iced::widget::text_editor;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Modal {
@@ -19,6 +20,13 @@ pub enum ContentMode {
 pub enum ThemeChoice {
     Songyanjian,
     Hanjiangxue,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DetailTool {
+    Favorite,
+    Edit,
+    Appreciation,
 }
 
 impl ThemeChoice {
@@ -69,7 +77,8 @@ pub enum Message {
     EditTitleChanged(String),
     EditAuthorChanged(String),
     EditDynastyChanged(String),
-    EditContentChanged(String),
+    EditContentChanged(text_editor::Action),
+    HoverDetailTool(Option<DetailTool>),
     SaveEdit,
     EditSaved(Result<EditedPoem, String>),
     RequestAppreciation,

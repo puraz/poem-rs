@@ -1,69 +1,113 @@
-use iced::widget::{Space, checkbox, column, container, row, scrollable, text, text_input};
-use iced::{Element, Length};
+use iced::widget::{Space, checkbox, column, container, row, scrollable, text};
+use iced::{Alignment, Color, Element, Length, Theme};
 
-use crate::ui::components::{ButtonKind, action_button, modal_frame, modal_header_with_close};
+use crate::ui::components::{
+    ButtonKind, compact_button, field_input, input_block, modal_frame, modal_header_with_close,
+};
 use crate::ui::message::Message;
 use crate::ui::state::SettingsForm;
+use crate::ui::theme;
 
 pub fn view<'a>(form: &'a SettingsForm) -> Element<'a, Message> {
     let mut content = column![
-        text(format!("当前模式：{}", form.mode_label)).size(14),
-        field(
+        status_row(form.mode_label.as_str()),
+        input_block(
             "Base URL",
-            text_input("https://api.openai.com/v1", &form.base_url)
+            field_input("https://api.openai.com/v1", &form.base_url)
                 .on_input(Message::SettingsBaseUrlChanged),
         ),
-        field(
+        input_block(
             "Model",
-            text_input("gpt-4.1-mini", &form.model).on_input(Message::SettingsModelChanged),
+            field_input("gpt-4.1-mini", &form.model).on_input(Message::SettingsModelChanged),
         ),
-        field(
+        input_block(
             "API Key",
-            text_input("输入 API Key", &form.api_key).on_input(Message::SettingsApiKeyChanged),
+            field_input("输入 API Key", &form.api_key).on_input(Message::SettingsApiKeyChanged),
         ),
-        container(
-            checkbox(form.allow_file_fallback)
-                .label("允许文件回退存储")
-                .on_toggle(Message::SettingsFallbackChanged),
-        )
-        .padding(16)
-        .width(Length::Fill)
-        .style(container::rounded_box),
+        fallback_section(form.allow_file_fallback),
     ]
-    .spacing(16);
+    .spacing(20);
 
     if !form.warning.trim().is_empty() {
-        content = content.push(
-            container(text(form.warning.as_str()).size(13))
-                .padding(16)
-                .width(Length::Fill)
-                .style(container::rounded_box),
-        );
+        content = content.push(warning_block(form.warning.as_str()));
     }
 
     modal_frame(
-        modal_header_with_close("AI 设置", None, Message::CloseModal),
+        modal_header_with_close("AI 设置", Some(""), Message::CloseModal),
         scrollable(content).height(Length::Shrink),
         Some(
             row![
-                action_button("清除 Key", ButtonKind::Danger)
-                    .width(128)
-                    .on_press(Message::ClearApiKey),
                 Space::new().width(Length::Fill),
-                action_button("保存设置", ButtonKind::Primary)
-                    .width(140)
+                compact_button("清除 Key", ButtonKind::DangerGhost)
+                    .width(116)
+                    .on_press(Message::ClearApiKey),
+                compact_button("保存设置", ButtonKind::Primary)
+                    .width(132)
                     .on_press(Message::SaveSettings),
             ]
             .spacing(12)
+            .align_y(Alignment::Center)
             .into(),
         ),
     )
 }
 
-fn field<'a>(label: &'a str, input: impl Into<Element<'a, Message>>) -> Element<'a, Message> {
-    container(column![text(label).size(14), input.into()].spacing(8))
-        .padding(16)
+fn status_row<'a>(mode_label: &'a str) -> Element<'a, Message> {
+    let accent = status_accent(mode_label);
+
+    row![
+        container(text("●").size(14)).style(move |_theme: &Theme| iced::widget::container::Style {
+            text_color: Some(accent),
+            ..Default::default()
+        }),
+        text("当前模式：").size(15),
+        container(text(mode_label).size(15)).style(move |_theme: &Theme| {
+            iced::widget::container::Style {
+                text_color: Some(accent),
+                ..Default::default()
+            }
+        }),
+    ]
+    .spacing(8)
+    .align_y(Alignment::Center)
+    .into()
+}
+
+fn fallback_section<'a>(allow_file_fallback: bool) -> Element<'a, Message> {
+    container(
+        column![
+            checkbox(allow_file_fallback)
+                .label("允许文件回退存储")
+                .size(20)
+                .text_size(16)
+                .spacing(10)
+                .on_toggle(Message::SettingsFallbackChanged),
+            row![
+                Space::new().width(Length::Fixed(34.0)),
+                container(text("当 API 调用失败时，将赏析结果回退存储到本地文件。").size(13))
+                    .style(theme::quiet_text),
+            ]
+            .align_y(Alignment::Center),
+        ]
+        .spacing(8),
+    )
+    .width(Length::Fill)
+    .into()
+}
+
+fn warning_block<'a>(warning: &'a str) -> Element<'a, Message> {
+    container(text(warning).size(13))
+        .padding([12, 14])
         .width(Length::Fill)
-        .style(container::rounded_box)
+        .style(theme::outline_panel)
         .into()
+}
+
+fn status_accent(mode_label: &str) -> Color {
+    match mode_label {
+        "已配置" => Color::from_rgb8(0x67, 0xB2, 0x79),
+        "回退存储" => Color::from_rgb8(0xC4, 0x8A, 0x4A),
+        "未配置" | "不可用" => Color::from_rgb8(0xC4, 0x5A, 0x4A),
+        _ => Color::from_rgb8(0x67, 0xB2, 0x79),
+    }
 }

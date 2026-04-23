@@ -2,7 +2,7 @@ use iced::{
     Background, Border, Color, Shadow, Theme, Vector,
     border::Radius,
     theme::Palette,
-    widget::{button, container, text_input},
+    widget::{button, container, text_editor, text_input},
 };
 
 use super::message::ThemeChoice;
@@ -262,10 +262,18 @@ pub fn modal_backdrop(theme: &Theme) -> container::Style {
 pub fn modal_frame(theme: &Theme) -> container::Style {
     let t = tokens(theme);
     container_style(
-        t.pane,
-        t.line_strong,
-        RADIUS_XL,
-        shadow(t.shadow, 0.0, 18.0, 42.0),
+        if is_light(theme) {
+            color(0xFFFDFC)
+        } else {
+            t.pane
+        },
+        if is_light(theme) {
+            color(0xE8DFD5)
+        } else {
+            t.line_strong
+        },
+        14.0,
+        shadow(t.shadow, 0.0, 14.0, 34.0),
         t.text,
     )
 }
@@ -286,7 +294,31 @@ pub fn toast_message_text(theme: &Theme) -> container::Style {
 }
 
 pub fn appreciation_panel(theme: &Theme) -> container::Style {
-    surface_style(theme, SurfaceKind::Appreciation)
+    let t = tokens(theme);
+
+    let (background, border_color, text_color, shadow_style) = if is_light(theme) {
+        (
+            color(0xF2EAE2),
+            color(0xE4D2C4),
+            color(0x4E4540),
+            shadow(t.shadow, 0.0, 8.0, 24.0),
+        )
+    } else {
+        (
+            color(0x332D29),
+            Color::from_rgba8(229, 211, 176, 0.16),
+            color(0xDED6CD),
+            shadow(t.shadow, 0.0, 6.0, 18.0),
+        )
+    };
+
+    container_style(
+        background,
+        border_color,
+        RADIUS_XL,
+        shadow_style,
+        text_color,
+    )
 }
 
 pub fn eyebrow_text(theme: &Theme) -> container::Style {
@@ -378,6 +410,44 @@ pub fn button_ghost(theme: &Theme, status: button::Status) -> button::Style {
 
 pub fn button_danger(theme: &Theme, status: button::Status) -> button::Style {
     button_style(theme, Tone::Danger, true, status)
+}
+
+pub fn button_danger_ghost(theme: &Theme, status: button::Status) -> button::Style {
+    let t = tokens(theme);
+    let (background, border_color) = match status {
+        button::Status::Active => (
+            if is_light(theme) {
+                color(0xFFFDFC)
+            } else {
+                t.pane_soft
+            },
+            tint(t.danger, if is_light(theme) { 0.38 } else { 0.55 }),
+        ),
+        button::Status::Hovered => (
+            tint(t.danger, if is_light(theme) { 0.08 } else { 0.14 }),
+            tint(t.danger, if is_light(theme) { 0.48 } else { 0.65 }),
+        ),
+        button::Status::Pressed => (
+            tint(t.danger, if is_light(theme) { 0.12 } else { 0.18 }),
+            tint(t.danger, if is_light(theme) { 0.56 } else { 0.72 }),
+        ),
+        button::Status::Disabled => (
+            tint(t.danger, if is_light(theme) { 0.04 } else { 0.10 }),
+            tint(t.danger, 0.22),
+        ),
+    };
+
+    button::Style {
+        background: Some(Background::Color(background)),
+        text_color: if matches!(status, button::Status::Disabled) {
+            tint(t.danger, 0.40)
+        } else {
+            t.danger
+        },
+        border: border(border_color, 1.0, RADIUS_MEDIUM),
+        shadow: Shadow::default(),
+        snap: false,
+    }
 }
 
 pub fn button_nav(theme: &Theme, status: button::Status) -> button::Style {
@@ -527,26 +597,26 @@ pub fn button_sidebar_theme_active(theme: &Theme, status: button::Status) -> but
 
 pub fn button_detail_icon(theme: &Theme, status: button::Status) -> button::Style {
     let t = tokens(theme);
-    let (background, border_color) = if is_light(theme) {
+    let background = if is_light(theme) {
         match status {
-            button::Status::Active => (color(0xFFFFFF), color(0xE5DACE)),
-            button::Status::Hovered => (color(0xFCF8F4), color(0xDED2C6)),
-            button::Status::Pressed => (color(0xF6EEE7), color(0xD5C8BB)),
-            button::Status::Disabled => (color(0xFAF6F1), color(0xEEE6DD)),
+            button::Status::Active => Color::TRANSPARENT,
+            button::Status::Hovered => tint(t.primary, 0.03),
+            button::Status::Pressed => tint(t.primary, 0.07),
+            button::Status::Disabled => Color::TRANSPARENT,
         }
     } else {
         match status {
-            button::Status::Active => (t.pane_soft, t.line_strong),
-            button::Status::Hovered => (lift(t.pane_soft, 0.03), t.line_strong),
-            button::Status::Pressed => (deepen(t.pane_soft, 0.03), t.line_strong),
-            button::Status::Disabled => (t.pane, t.line_subtle),
+            button::Status::Active => Color::TRANSPARENT,
+            button::Status::Hovered => Color::from_rgba8(229, 211, 176, 0.03),
+            button::Status::Pressed => Color::from_rgba8(229, 211, 176, 0.07),
+            button::Status::Disabled => Color::TRANSPARENT,
         }
     };
 
     button::Style {
         background: Some(Background::Color(background)),
         text_color: if is_light(theme) { t.title } else { t.text },
-        border: border(border_color, 1.0, 14.0),
+        border: border(Color::TRANSPARENT, 0.0, 16.0),
         shadow: Shadow::default(),
         snap: false,
     }
@@ -554,17 +624,26 @@ pub fn button_detail_icon(theme: &Theme, status: button::Status) -> button::Styl
 
 pub fn button_detail_icon_active(theme: &Theme, status: button::Status) -> button::Style {
     let t = tokens(theme);
-    let background = match status {
-        button::Status::Active => t.primary,
-        button::Status::Hovered => lift(t.primary, 0.04),
-        button::Status::Pressed => deepen(t.primary, 0.04),
-        button::Status::Disabled => tint(t.primary, 0.28),
+    let background = if is_light(theme) {
+        match status {
+            button::Status::Active => Color::TRANSPARENT,
+            button::Status::Hovered => tint(t.primary, 0.03),
+            button::Status::Pressed => tint(t.primary, 0.07),
+            button::Status::Disabled => Color::TRANSPARENT,
+        }
+    } else {
+        match status {
+            button::Status::Active => Color::TRANSPARENT,
+            button::Status::Hovered => Color::from_rgba8(229, 211, 176, 0.03),
+            button::Status::Pressed => Color::from_rgba8(229, 211, 176, 0.07),
+            button::Status::Disabled => Color::TRANSPARENT,
+        }
     };
 
     button::Style {
         background: Some(Background::Color(background)),
-        text_color: color(0xFFF8F2),
-        border: border(Color::TRANSPARENT, 0.0, 14.0),
+        text_color: t.primary,
+        border: border(Color::TRANSPARENT, 0.0, 16.0),
         shadow: Shadow::default(),
         snap: false,
     }
@@ -596,6 +675,25 @@ pub fn text_input_search_embedded(theme: &Theme, status: text_input::Status) -> 
         placeholder: t.text_soft,
         value,
         selection: tint(t.primary, if is_light(theme) { 0.18 } else { 0.30 }),
+    }
+}
+
+pub fn text_editor_default(theme: &Theme, status: text_editor::Status) -> text_editor::Style {
+    let t = tokens(theme);
+    let base = t.pane_soft;
+    let (background, border_color) = match status {
+        text_editor::Status::Active => (base, t.line_subtle),
+        text_editor::Status::Hovered => (lift(base, 0.01), t.line_strong),
+        text_editor::Status::Focused { .. } => (lift(base, 0.02), t.primary),
+        text_editor::Status::Disabled => (tint(base, 0.75), tint(t.line_subtle, 0.55)),
+    };
+
+    text_editor::Style {
+        background: Background::Color(background),
+        border: border(border_color, 1.0, RADIUS_MEDIUM),
+        placeholder: t.text_soft,
+        value: t.text,
+        selection: tint(t.primary, if is_light(theme) { 0.22 } else { 0.34 }),
     }
 }
 

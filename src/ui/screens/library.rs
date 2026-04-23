@@ -6,6 +6,9 @@ use crate::ui::theme;
 
 use super::super::message::Message;
 
+const ICON_FAVORITE: &str = "assets/icons/favorite-outline.svg";
+const ICON_FAVORITE_FILLED: &str = "assets/icons/favorite-filled.svg";
+
 pub fn view<'a>(
     poems: Vec<Poem>,
     selected_poem_id: Option<&str>,
@@ -43,16 +46,15 @@ pub fn view<'a>(
             let snippet = poem.snippet();
             let is_favorite = poem.is_favorite;
 
-            let favorite_icon = if is_favorite {
-                text("★").size(18)
-            } else {
-                text("☆").size(18)
-            };
-
             let card = container(
-                row![
-                    column![
+                column![
+                    row![
                         text(title).size(if selected { 24 } else { 22 }),
+                        iced::widget::Space::new().width(Length::Fill),
+                        favorite_icon(is_favorite),
+                    ]
+                    .align_y(Alignment::Center),
+                    column![
                         container(text(meta).size(14)).style(move |active_theme| {
                             if selected {
                                 theme::library_item_meta_selected(active_theme)
@@ -70,21 +72,8 @@ pub fn view<'a>(
                     ]
                     .spacing(10)
                     .width(Length::Fill),
-                    container(
-                        row![favorite_icon, text("›").size(22),]
-                            .spacing(8)
-                            .align_y(iced::Alignment::Center),
-                    )
-                    .style(move |active_theme| {
-                        if selected {
-                            theme::library_item_meta_selected(active_theme)
-                        } else {
-                            theme::subdued_text(active_theme)
-                        }
-                    }),
                 ]
-                .spacing(16)
-                .align_y(iced::Alignment::Center),
+                .spacing(10),
             )
             .padding([22, 28])
             .width(Length::Fill)
@@ -117,4 +106,24 @@ pub fn view<'a>(
     .padding([28, 28])
     .style(theme::library_stage)
     .into()
+}
+
+fn favorite_icon<'a>(is_favorite: bool) -> Element<'a, Message> {
+    let icon_path = if is_favorite {
+        ICON_FAVORITE_FILLED
+    } else {
+        ICON_FAVORITE
+    };
+
+    svg(icon_path)
+        .width(Length::Fixed(22.0))
+        .height(Length::Fixed(22.0))
+        .style(move |active_theme: &Theme, _status| svg::Style {
+            color: Some(if is_favorite {
+                theme::tokens(active_theme).primary
+            } else {
+                theme::tokens(active_theme).text_muted
+            }),
+        })
+        .into()
 }

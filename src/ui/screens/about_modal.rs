@@ -21,14 +21,14 @@ pub fn view<'a>() -> Element<'a, Message> {
     let body = scrollable(
         column![
             hero,
-            section(
+            /*section(
                 "这次重写关注什么",
                 &[
                     "左中右三栏桌面结构，让导航、列表与阅读区分工更明确。",
                     "收藏、编辑、AI 赏析都回到主阅读路径，不再停留在半成品状态。",
                     "松烟笺与寒江雪双主题同时提供日读与夜读体验。",
                 ],
-            ),
+            ),*/
         ]
         .spacing(16),
     )

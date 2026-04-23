@@ -11,6 +11,7 @@ pub enum ButtonKind {
     Secondary,
     Ghost,
     Danger,
+    DangerGhost,
     Nav,
     NavActive,
 }
@@ -67,6 +68,7 @@ fn style_for(kind: ButtonKind) -> fn(&Theme, button::Status) -> button::Style {
         ButtonKind::Secondary => theme::button_secondary,
         ButtonKind::Ghost => theme::button_ghost,
         ButtonKind::Danger => theme::button_danger,
+        ButtonKind::DangerGhost => theme::button_danger_ghost,
         ButtonKind::Nav => theme::button_nav,
         ButtonKind::NavActive => theme::button_nav_active,
     }
