@@ -9,8 +9,7 @@ use crate::config::app::AppPaths;
 use crate::storage::{AppDatabase, StoredAiConfig};
 
 use super::components::{
-    ButtonKind, SurfaceKind, ToastTone, action_button, compact_button, modal_overlay, nav_surface,
-    page_shell, section_surface, surface, toast, toast_host,
+    SurfaceKind, ToastTone, modal_overlay, nav_surface, page_shell, surface, toast, toast_host,
 };
 use super::message::{ContentMode, Message, Modal, ThemeChoice};
 use super::screens::{about_modal, discovery_modal, edit_modal, library, settings_modal};
@@ -368,19 +367,25 @@ impl PoemApp {
     }
 
     fn view(&self) -> Element<'_, Message> {
-        let shell = row![
-            self.sidebar_view(),
-            container(self.middle_pane())
-                .width(Length::FillPortion(5))
-                .height(Length::Fill),
-            container(self.detail_pane())
-                .width(Length::FillPortion(3))
-                .height(Length::Fill),
-        ]
-        .spacing(24)
-        .height(Length::Fill);
+        let content_region = container(
+            row![
+                self.sidebar_view(),
+                content_vertical_divider::<Message>(),
+                container(self.middle_pane())
+                    .width(Length::FillPortion(5))
+                    .height(Length::Fill),
+                container(self.detail_pane())
+                    .width(Length::FillPortion(3))
+                    .height(Length::Fill),
+            ]
+            .spacing(0)
+            .height(Length::Fill),
+        )
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(theme::content_shell);
 
-        let base: Element<'_, Message> = page_shell(shell).into();
+        let base: Element<'_, Message> = page_shell(content_region).into();
         let with_modal = match self.state.active_modal {
             Modal::None => base,
             Modal::Discovery => modal_overlay(
@@ -492,7 +497,14 @@ impl PoemApp {
         .spacing(16);
 
         nav_surface(
-            column![header, main_nav, Space::new().height(Length::Fill), footer,].spacing(0),
+            column![
+                header,
+                Space::new().height(Length::Fixed(16.0)),
+                main_nav,
+                Space::new().height(Length::Fill),
+                footer,
+            ]
+            .spacing(0),
         )
         .width(296)
         .height(Length::Fill)
@@ -515,77 +527,97 @@ impl PoemApp {
     }
 
     fn detail_pane(&self) -> Element<'_, Message> {
+        let pane_title = container(text("阅读").size(14)).style(theme::title_text);
+
         let Some(poem) = self.state.selected_poem() else {
-            return surface(
-                column![
-                    text("暂无诗词").size(28),
-                    text("当前模式下没有可展示的内容。").size(16),
-                ]
-                .spacing(12),
-                SurfaceKind::Raised,
-            )
+            return row![
+                content_vertical_divider::<Message>(),
+                container(
+                    column![
+                        pane_title,
+                        Space::new().height(Length::FillPortion(1)),
+                        column![
+                            text("暂无诗词").size(28),
+                            text("当前模式下没有可展示的内容。").size(16),
+                        ]
+                        .spacing(12),
+                        Space::new().height(Length::FillPortion(1)),
+                    ]
+                    .spacing(20)
+                )
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .padding([28, 34])
+                .style(theme::detail_stage),
+            ]
+            .width(Length::Fill)
+            .height(Length::Fill)
             .into();
         };
 
-        let favorite_label = if poem.is_favorite {
-            "★ 已收藏"
+        let favorite_icon = if poem.is_favorite {
+            ICON_FAVORITE_FILLED
         } else {
-            "☆ 收藏"
+            ICON_FAVORITE
         };
-        let appreciation_card = if self.state.appreciation.loading {
-            surface(text("AI 正在生成赏析…").size(15), SurfaceKind::Accent)
+
+        let action_row = row![
+            pane_title,
+            Space::new().width(Length::Fill),
+            detail_icon_button(
+                favorite_icon,
+                if poem.is_favorite {
+                    SidebarIconTone::Inverse
+                } else {
+                    SidebarIconTone::Default
+                },
+                poem.is_favorite
+            )
+            .on_press(Message::ToggleFavorite),
+            detail_icon_button(ICON_EDIT, SidebarIconTone::Default, false)
+                .on_press(Message::OpenEditModal),
+            detail_icon_button(ICON_APPRECIATION, SidebarIconTone::Default, false)
+                .on_press(Message::RequestAppreciation),
+        ]
+        .spacing(12)
+        .align_y(Alignment::Center);
+
+        let mut content = column![
+            action_row,
+            Space::new().height(Length::Fixed(18.0)),
+            container(text(poem.title.clone()).size(38)).style(theme::title_text),
+            container(text(poem.metadata()).size(17)).style(theme::subdued_text),
+            container(text(poem.content.clone()).size(24)).style(theme::title_text),
+        ]
+        .spacing(22);
+
+        if self.state.appreciation.loading {
+            content = content.push(surface(text("正在生成赏析…").size(15), SurfaceKind::Accent));
         } else if !self.state.appreciation.error.is_empty() {
-            surface(
+            content = content.push(surface(
                 text(self.state.appreciation.error.clone()).size(15),
                 SurfaceKind::Accent,
-            )
+            ));
         } else if !self.state.appreciation.content.is_empty()
             && self.state.appreciation.poem_id.as_deref() == Some(poem.id.as_str())
         {
-            container(section_surface(
-                "AI 赏析",
+            content = content.push(surface(
                 text(self.state.appreciation.content.clone()).size(16),
                 SurfaceKind::Accent,
-            ))
-            .into()
-        } else {
-            container(iced::widget::Space::new()).into()
-        };
+            ));
+        }
 
-        let ai_button = container(
-            action_button("✨ AI 赏析", ButtonKind::Primary)
+        row![
+            content_vertical_divider::<Message>(),
+            container(content)
                 .width(Length::Fill)
-                .on_press(Message::RequestAppreciation),
-        )
+                .height(Length::Fill)
+                .padding([28, 34])
+                .style(theme::detail_stage),
+        ]
         .width(Length::Fill)
-        .center_x(Length::Fill);
-
-        section_surface(
-            "阅读",
-            column![
-                row![
-                    iced::widget::Space::new().width(Length::Fill),
-                    compact_button(
-                        favorite_label,
-                        if poem.is_favorite {
-                            ButtonKind::Primary
-                        } else {
-                            ButtonKind::Ghost
-                        }
-                    )
-                    .on_press(Message::ToggleFavorite),
-                    compact_button("✎ 编辑", ButtonKind::Ghost).on_press(Message::OpenEditModal),
-                ]
-                .spacing(12),
-                container(text(poem.title.clone()).size(36)).style(theme::title_text),
-                container(text(poem.metadata()).size(18)).style(theme::subdued_text),
-                container(text(poem.content.clone()).size(24)).style(theme::title_text),
-                ai_button,
-                appreciation_card,
-            ]
-            .spacing(20),
-            SurfaceKind::Raised,
-        )
+        .height(Length::Fill)
+        .into()
     }
 
     fn reload_poems(&mut self) {
@@ -631,10 +663,13 @@ const ICON_BRAND: &str = "assets/icons/brand-book.svg";
 const ICON_PLUS: &str = "assets/icons/plus.svg";
 const ICON_HOME: &str = "assets/icons/home.svg";
 const ICON_FAVORITE: &str = "assets/icons/favorite-outline.svg";
+const ICON_FAVORITE_FILLED: &str = "assets/icons/favorite-filled.svg";
 const ICON_ABOUT: &str = "assets/icons/about.svg";
 const ICON_SETTINGS: &str = "assets/icons/settings.svg";
 const ICON_BRUSH: &str = "assets/icons/brush.svg";
 const ICON_SNOWFLAKE: &str = "assets/icons/snowflake.svg";
+const ICON_EDIT: &str = "assets/icons/edit.svg";
+const ICON_APPRECIATION: &str = "assets/icons/appreciation.svg";
 
 #[derive(Debug, Clone, Copy)]
 enum SidebarIconTone {
@@ -649,6 +684,13 @@ fn sidebar_divider<'a, Message: 'a>() -> iced::widget::Container<'a, Message> {
         .width(Length::Fill)
         .height(1)
         .style(theme::sidebar_divider)
+}
+
+fn content_vertical_divider<'a, Message: 'a>() -> iced::widget::Container<'a, Message> {
+    container(Space::new().width(1))
+        .width(1)
+        .height(Length::Fill)
+        .style(theme::content_divider)
 }
 
 fn sidebar_primary_button<'a>(
@@ -732,6 +774,28 @@ fn sidebar_theme_button<'a>(
         theme::button_sidebar_theme_active
     } else {
         theme::button_sidebar_theme
+    })
+}
+
+fn detail_icon_button<'a>(
+    icon_path: &'static str,
+    icon_tone: SidebarIconTone,
+    active: bool,
+) -> button::Button<'a, Message> {
+    button(
+        container(sidebar_icon::<Message>(icon_path, 20.0, icon_tone))
+            .width(Length::Fixed(20.0))
+            .height(Length::Fixed(20.0))
+            .center_x(Length::Shrink)
+            .center_y(Length::Shrink),
+    )
+    .width(Length::Fixed(48.0))
+    .height(Length::Fixed(48.0))
+    .padding(0)
+    .style(if active {
+        theme::button_detail_icon_active
+    } else {
+        theme::button_detail_icon
     })
 }
 

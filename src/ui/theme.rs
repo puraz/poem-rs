@@ -1,5 +1,6 @@
 use iced::{
     Background, Border, Color, Shadow, Theme, Vector,
+    border::Radius,
     theme::Palette,
     widget::{button, container, text_input},
 };
@@ -100,6 +101,39 @@ pub fn panel(theme: &Theme) -> container::Style {
     surface_style(theme, SurfaceKind::Pane)
 }
 
+pub fn content_shell(theme: &Theme) -> container::Style {
+    let t = tokens(theme);
+    let background = if is_light(theme) {
+        color(0xFFFCF9)
+    } else {
+        t.pane
+    };
+
+    container::Style {
+        text_color: Some(t.text),
+        background: Some(Background::Color(background)),
+        border: Border {
+            color: if is_light(theme) {
+                color(0xEDE3D8)
+            } else {
+                Color::from_rgba8(229, 211, 176, 0.10)
+            },
+            width: 1.0,
+            radius: Radius::default()
+                .top_left(16)
+                .top_right(16)
+                .bottom_right(16)
+                .bottom_left(16),
+        },
+        shadow: if is_light(theme) {
+            shadow(t.shadow, 0.0, 10.0, 24.0)
+        } else {
+            shadow(t.shadow, 0.0, 8.0, 18.0)
+        },
+        snap: false,
+    }
+}
+
 pub fn sidebar_panel(theme: &Theme) -> container::Style {
     surface_style(theme, SurfaceKind::Sidebar)
 }
@@ -112,14 +146,92 @@ pub fn accent_panel(theme: &Theme) -> container::Style {
     surface_style(theme, SurfaceKind::PanelAccent)
 }
 
+pub fn library_stage(theme: &Theme) -> container::Style {
+    let t = tokens(theme);
+
+    container::Style {
+        text_color: Some(t.text),
+        background: Some(Background::Color(if is_light(theme) {
+            color(0xFFFCF9)
+        } else {
+            t.pane
+        })),
+        border: border(Color::TRANSPARENT, 0.0, 0.0),
+        shadow: Shadow::default(),
+        snap: false,
+    }
+}
+
+pub fn library_search_shell(theme: &Theme) -> container::Style {
+    let t = tokens(theme);
+    let (background, border_color) = if is_light(theme) {
+        (color(0xFFFFFF), color(0xDCD2C7))
+    } else {
+        (t.pane_soft, t.line_strong)
+    };
+
+    container_style(background, border_color, 14.0, Shadow::default(), t.text)
+}
+
+pub fn detail_stage(theme: &Theme) -> container::Style {
+    let t = tokens(theme);
+
+    container::Style {
+        text_color: Some(t.text),
+        background: Some(Background::Color(if is_light(theme) {
+            color(0xFFFCF9)
+        } else {
+            t.pane
+        })),
+        border: Border {
+            color: Color::TRANSPARENT,
+            width: 0.0,
+            radius: Radius::default().right(16),
+        },
+        shadow: Shadow::default(),
+        snap: false,
+    }
+}
+
+pub fn content_divider(theme: &Theme) -> container::Style {
+    container::Style {
+        text_color: None,
+        background: Some(Background::Color(if is_light(theme) {
+            color(0xEDE3D8)
+        } else {
+            Color::from_rgba8(229, 211, 176, 0.12)
+        })),
+        border: Border::default(),
+        shadow: Shadow::default(),
+        snap: false,
+    }
+}
+
+pub fn library_item_panel(theme: &Theme) -> container::Style {
+    let t = tokens(theme);
+    let (background, border_color, text_color) = if is_light(theme) {
+        (color(0xFFFFFF), color(0xE8DED4), t.title)
+    } else {
+        (t.pane_soft, t.line_subtle, t.text)
+    };
+
+    container_style(
+        background,
+        border_color,
+        18.0,
+        Shadow::default(),
+        text_color,
+    )
+}
+
 pub fn library_item_selected_panel(theme: &Theme) -> container::Style {
     let t = tokens(theme);
     let (background, border_color, text_color, shadow_style) = if is_light(theme) {
         (
-            color(0xF7ECE8),
-            tint(t.primary, 0.28),
+            color(0xFFFBF8),
+            tint(t.primary, 0.34),
             t.title,
-            shadow(t.shadow, 0.0, 6.0, 18.0),
+            Shadow::default(),
         )
     } else {
         (
@@ -413,6 +525,51 @@ pub fn button_sidebar_theme_active(theme: &Theme, status: button::Status) -> but
     }
 }
 
+pub fn button_detail_icon(theme: &Theme, status: button::Status) -> button::Style {
+    let t = tokens(theme);
+    let (background, border_color) = if is_light(theme) {
+        match status {
+            button::Status::Active => (color(0xFFFFFF), color(0xE5DACE)),
+            button::Status::Hovered => (color(0xFCF8F4), color(0xDED2C6)),
+            button::Status::Pressed => (color(0xF6EEE7), color(0xD5C8BB)),
+            button::Status::Disabled => (color(0xFAF6F1), color(0xEEE6DD)),
+        }
+    } else {
+        match status {
+            button::Status::Active => (t.pane_soft, t.line_strong),
+            button::Status::Hovered => (lift(t.pane_soft, 0.03), t.line_strong),
+            button::Status::Pressed => (deepen(t.pane_soft, 0.03), t.line_strong),
+            button::Status::Disabled => (t.pane, t.line_subtle),
+        }
+    };
+
+    button::Style {
+        background: Some(Background::Color(background)),
+        text_color: if is_light(theme) { t.title } else { t.text },
+        border: border(border_color, 1.0, 14.0),
+        shadow: Shadow::default(),
+        snap: false,
+    }
+}
+
+pub fn button_detail_icon_active(theme: &Theme, status: button::Status) -> button::Style {
+    let t = tokens(theme);
+    let background = match status {
+        button::Status::Active => t.primary,
+        button::Status::Hovered => lift(t.primary, 0.04),
+        button::Status::Pressed => deepen(t.primary, 0.04),
+        button::Status::Disabled => tint(t.primary, 0.28),
+    };
+
+    button::Style {
+        background: Some(Background::Color(background)),
+        text_color: color(0xFFF8F2),
+        border: border(Color::TRANSPARENT, 0.0, 14.0),
+        shadow: Shadow::default(),
+        snap: false,
+    }
+}
+
 pub fn text_input_default(theme: &Theme, status: text_input::Status) -> text_input::Style {
     input_style(theme, status, false)
 }
@@ -423,6 +580,23 @@ pub fn text_input_search(theme: &Theme, status: text_input::Status) -> text_inpu
 
 pub fn text_input_search_prominent(theme: &Theme, status: text_input::Status) -> text_input::Style {
     input_style_with_radius(theme, status, true, RADIUS_LARGE)
+}
+
+pub fn text_input_search_embedded(theme: &Theme, status: text_input::Status) -> text_input::Style {
+    let t = tokens(theme);
+    let value = match status {
+        text_input::Status::Disabled => tint(t.text, 0.40),
+        _ => t.text,
+    };
+
+    text_input::Style {
+        background: Background::Color(Color::TRANSPARENT),
+        border: border(Color::TRANSPARENT, 0.0, 0.0),
+        icon: t.text_muted,
+        placeholder: t.text_soft,
+        value,
+        selection: tint(t.primary, if is_light(theme) { 0.18 } else { 0.30 }),
+    }
 }
 
 pub fn chip_style(theme: &Theme, tone: Tone) -> container::Style {
@@ -455,21 +629,23 @@ pub fn surface_style(theme: &Theme, kind: SurfaceKind) -> container::Style {
             t.text,
         ),
         SurfaceKind::Sidebar => {
-            let (background, border_color, shadow_style) = if is_light(theme) {
-                (
-                    color(0xFFFCF9),
-                    color(0xEFE5DB),
-                    shadow(t.shadow, 0.0, 10.0, 26.0),
-                )
+            let background = if is_light(theme) {
+                color(0xFFFCF9)
             } else {
-                (
-                    color(0x252525),
-                    Color::from_rgba8(229, 211, 176, 0.10),
-                    shadow(t.shadow, 0.0, 8.0, 20.0),
-                )
+                color(0x252525)
             };
 
-            container_style(background, border_color, 22.0, shadow_style, t.text)
+            container::Style {
+                text_color: Some(t.text),
+                background: Some(Background::Color(background)),
+                border: Border {
+                    color: Color::TRANSPARENT,
+                    width: 0.0,
+                    radius: Radius::default().left(16),
+                },
+                shadow: Shadow::default(),
+                snap: false,
+            }
         }
         SurfaceKind::Pane => container_style(
             t.pane,
