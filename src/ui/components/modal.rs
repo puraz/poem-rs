@@ -3,6 +3,7 @@ use iced::{
     widget::{self, mouse_area, opaque},
 };
 
+use super::button::{ButtonKind, compact_button};
 use crate::ui::theme;
 
 pub fn modal_header<'a, Message: 'a>(
@@ -21,6 +22,23 @@ pub fn modal_header<'a, Message: 'a>(
     text_stack.into()
 }
 
+pub fn modal_header_with_close<'a, Message: Clone + 'a>(
+    title: impl Into<String>,
+    subtitle: Option<&'a str>,
+    close_message: Message,
+) -> Element<'a, Message> {
+    widget::Row::new()
+        .align_y(iced::Alignment::Start)
+        .push(modal_header(title, subtitle))
+        .push(widget::Space::new().width(Length::Fill))
+        .push(
+            compact_button("关闭", ButtonKind::Secondary)
+                .width(112)
+                .on_press(close_message),
+        )
+        .into()
+}
+
 pub fn modal_frame<'a, Message: 'a>(
     header: impl Into<Element<'a, Message>>,
     body: impl Into<Element<'a, Message>>,
@@ -32,16 +50,12 @@ pub fn modal_frame<'a, Message: 'a>(
         .push(body);
 
     if let Some(footer) = footer {
-        frame = frame.push(
-            widget::container(footer)
-                .padding(theme::SPACE_1)
-                .style(theme::outline_panel),
-        );
+        frame = frame.push(widget::container(footer).padding(theme::SPACE_1));
     }
 
     widget::container(frame)
         .width(Length::Fill)
-        .max_width(760)
+        .max_width(820)
         .padding(theme::SPACE_6)
         .style(theme::modal_frame)
         .into()

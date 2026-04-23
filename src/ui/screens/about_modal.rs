@@ -1,7 +1,7 @@
-use iced::widget::{Space, button, column, container, row, scrollable, text};
+use iced::widget::{column, container, scrollable, text};
 use iced::{Element, Length};
 
-use crate::ui::components::{modal_frame, modal_header};
+use crate::ui::components::{modal_frame, modal_header_with_close};
 use crate::ui::message::Message;
 
 pub fn view<'a>() -> Element<'a, Message> {
@@ -24,16 +24,9 @@ pub fn view<'a>() -> Element<'a, Message> {
             section(
                 "这次重写关注什么",
                 &[
-                    "本地搜索优先，保持诗词浏览与阅读路径足够直接。",
-                    "AI 发现以模态方式展开，聚焦关键词、片段与意境检索。",
-                    "设置与关于页改为共享模态体系，减少侧边栏式干扰。",
-                ],
-            ),
-            section(
-                "当前范围说明",
-                &[
-                    "首个 Iced 版本刻意不包含收藏、AI 赏析与旧筛选分组。",
-                    "窗口尺寸持久化不在当前重写范围内。",
+                    "左中右三栏桌面结构，让导航、列表与阅读区分工更明确。",
+                    "收藏、编辑、AI 赏析都回到主阅读路径，不再停留在半成品状态。",
+                    "松烟笺与寒江雪双主题同时提供日读与夜读体验。",
                 ],
             ),
         ]
@@ -42,18 +35,9 @@ pub fn view<'a>() -> Element<'a, Message> {
     .height(Length::Fill);
 
     modal_frame(
-        modal_header("关于", Some("应用说明与当前重写范围")),
+        modal_header_with_close("关于", None, Message::CloseModal),
         body,
-        Some(
-            row![
-                Space::new().width(Length::Fill),
-                button("关闭")
-                    .style(button::secondary)
-                    .on_press(Message::CloseModal),
-            ]
-            .spacing(12)
-            .into(),
-        ),
+        None,
     )
 }
 

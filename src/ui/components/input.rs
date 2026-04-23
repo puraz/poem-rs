@@ -27,6 +27,17 @@ pub fn search_input<'a, Message: Clone + 'a>(
         .style(theme::text_input_search)
 }
 
+pub fn search_input_prominent<'a, Message: Clone + 'a>(
+    placeholder: &'a str,
+    value: &'a str,
+) -> TextInput<'a, Message> {
+    widget::text_input(placeholder, value)
+        .padding([theme::SPACE_5, theme::SPACE_5])
+        .size(18)
+        .width(Length::Fill)
+        .style(theme::text_input_search_prominent)
+}
+
 pub fn search_field<'a, Message: Clone + 'a>(value: &'a str) -> TextInput<'a, Message> {
     search_input("搜索本地诗词: 标题、作者、内容", value)
 }

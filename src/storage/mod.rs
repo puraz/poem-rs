@@ -163,6 +163,16 @@ impl AppDatabase {
         Ok(())
     }
 
+    pub fn load_theme_preference(&self) -> Result<Option<String>> {
+        let conn = self.connect()?;
+        self.get_meta(&conn, "ui.theme")
+    }
+
+    pub fn save_theme_preference(&self, theme: &str) -> Result<()> {
+        let conn = self.connect()?;
+        self.set_meta(&conn, "ui.theme", theme)
+    }
+
     pub fn load_window_geometry(&self) -> Result<Option<WindowGeometry>> {
         let conn = self.connect()?;
         Ok(self
@@ -203,6 +213,37 @@ impl AppDatabase {
                 updated_at = excluded.updated_at
             "#,
             params![poem_id, analysis.display_text(), model, now_string()],
+        )?;
+        Ok(())
+    }
+
+    pub fn update_poem(
+        &self,
+        poem_id: &str,
+        title: &str,
+        author: &str,
+        dynasty: &str,
+        content: &str,
+    ) -> Result<()> {
+        let conn = self.connect()?;
+        conn.execute(
+            r#"
+            UPDATE poems
+            SET title = ?2,
+                author = ?3,
+                dynasty = ?4,
+                content = ?5,
+                checksum = ?6
+            WHERE id = ?1
+            "#,
+            params![
+                poem_id,
+                title,
+                author,
+                dynasty,
+                content,
+                checksum_hex(content.as_bytes())
+            ],
         )?;
         Ok(())
     }
@@ -565,6 +606,40 @@ mod tests {
             loaded.settings.timeout_secs,
             AiSettings::default().timeout_secs
         );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn theme_preference_round_trips() {
+        let path = temp_db_path("theme-preference");
+        let db = AppDatabase::new(&path);
+        db.bootstrap().expect("bootstrap");
+
+        db.save_theme_preference("songyanjian").expect("save theme");
+        assert_eq!(
+            db.load_theme_preference().expect("load theme"),
+            Some("songyanjian".to_string())
+        );
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn update_poem_persists_selected_fields() {
+        let path = temp_db_path("update-poem");
+        let db = AppDatabase::new(&path);
+        db.bootstrap().expect("bootstrap");
+        let poem_id = db.list_poems().expect("poems")[0].id.clone();
+
+        db.update_poem(&poem_id, "新标题", "新作者", "新朝代", "新正文")
+            .expect("update poem");
+
+        let poem = db.get_poem(&poem_id).expect("get").expect("exists");
+        assert_eq!(poem.title, "新标题");
+        assert_eq!(poem.author, "新作者");
+        assert_eq!(poem.dynasty, "新朝代");
+        assert_eq!(poem.content, "新正文");
 
         let _ = std::fs::remove_file(path);
     }

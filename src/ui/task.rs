@@ -2,12 +2,14 @@ use anyhow::{Result, anyhow};
 
 use crate::config::ai::{FileSecretStore, KeyringSecretStore};
 use crate::config::app::AppPaths;
-use crate::domain::DiscoveredPoem;
-use crate::services::ai::{HttpAiTransport, OpenAiCompatibleClient, build_discovery_prompt};
+use crate::domain::{AiAppreciation, DiscoveredPoem, Poem};
+use crate::services::ai::{
+    HttpAiTransport, OpenAiCompatibleClient, build_appreciation_prompt, build_discovery_prompt,
+};
 use crate::storage::{AppDatabase, StoredAiConfig};
 
-use super::message::{ImportedPoem, SettingsSaveResult};
-use super::state::current_secret;
+use super::message::{AppreciationResult, EditedPoem, ImportedPoem, SettingsSaveResult};
+use super::state::{EditForm, current_secret};
 
 pub async fn run_discovery_search(
     paths: AppPaths,
@@ -36,6 +38,63 @@ pub async fn import_discovery_poem(
             title: poem.title,
         })
         .map_err(|err| format!("导入失败: {err}"))
+}
+
+pub async fn request_appreciation(
+    paths: AppPaths,
+    config: StoredAiConfig,
+    poem: Poem,
+) -> Result<AiAppreciation, String> {
+    let (secret, _) = current_secret(&paths, config.allow_file_fallback);
+    let secret =
+        secret.ok_or_else(|| "AI 未配置，请先在设置中填写可用模型与 API Key。".to_string())?;
+    let client = OpenAiCompatibleClient::new(HttpAiTransport::new(config.settings, Some(secret)));
+    let prompt = build_appreciation_prompt(
+        &poem.id,
+        &poem.title,
+        &poem.author,
+        &poem.dynasty,
+        &poem.content,
+    );
+
+    client
+        .appreciate(&prompt)
+        .map_err(|err| format!("AI 赏析失败: {err:?}"))
+}
+
+pub async fn generate_and_persist_appreciation(
+    paths: AppPaths,
+    db: AppDatabase,
+    config: StoredAiConfig,
+    poem: Poem,
+) -> Result<AppreciationResult, String> {
+    let poem_id = poem.id.clone();
+    let model = config.settings.model.clone();
+    let appreciation = request_appreciation(paths, config, poem).await?;
+
+    db.save_cached_analysis(&poem_id, &appreciation, &model)
+        .map_err(|err| format!("保存赏析缓存失败: {err}"))?;
+
+    Ok(AppreciationResult {
+        poem_id,
+        content: appreciation.display_text(),
+    })
+}
+
+pub async fn save_edited_poem(db: AppDatabase, form: EditForm) -> Result<EditedPoem, String> {
+    db.update_poem(
+        &form.poem_id,
+        form.title.trim(),
+        form.author.trim(),
+        form.dynasty.trim(),
+        form.content.trim(),
+    )
+    .map_err(|err| format!("保存诗词失败: {err}"))?;
+
+    Ok(EditedPoem {
+        poem_id: form.poem_id,
+        title: form.title.trim().to_string(),
+    })
 }
 
 pub async fn save_settings(

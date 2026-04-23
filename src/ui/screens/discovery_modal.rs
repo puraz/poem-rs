@@ -1,71 +1,79 @@
-use iced::widget::{Space, button, column, container, row, scrollable, text, text_input};
+use iced::widget::{Space, column, container, row, scrollable, text};
 use iced::{Element, Length};
 
-use crate::ui::components::{modal_frame, modal_header};
+use crate::ui::components::{
+    ButtonKind, action_button, modal_frame, modal_header_with_close, search_input_prominent,
+    surface,
+};
 use crate::ui::message::Message;
 use crate::ui::state::DiscoveryListItem;
+use crate::ui::{components::SurfaceKind, theme};
 
-pub fn view(
-    query: String,
+pub fn view<'a>(
+    query: &'a str,
     loading: bool,
-    status: String,
+    status: &'a str,
     items: Vec<DiscoveryListItem>,
-) -> Element<'static, Message> {
-    let search_label = if loading { "搜索中" } else { "搜索" };
+) -> Element<'a, Message> {
+    let search_label = if loading { "搜索中..." } else { "搜索" };
+    let result_count = items.len();
 
-    let results: Element<'static, Message> = if items.is_empty() {
-        container(text(empty_state_text(&query, loading, &status)).size(15))
-            .padding(24)
-            .width(Length::Fill)
-            .style(container::rounded_box)
-            .into()
-    } else {
+    let search_panel = surface(
+        column![
+            row![
+                search_input_prominent("例如：春江花月夜 / 西窗烛 / 山雨欲来", query)
+                    .on_input(Message::DiscoveryQueryChanged)
+                    .width(Length::Fill),
+                action_button(search_label, ButtonKind::Primary)
+                    .width(140)
+                    .on_press(Message::SubmitDiscovery),
+            ]
+            .spacing(14)
+            .align_y(iced::Alignment::Center),
+            if !loading && !status.trim().is_empty() {
+                container(text(status).size(14)).style(theme::subdued_text)
+            } else if result_count > 0 {
+                container(text(format!("已生成 {result_count} 条候选。")).size(14))
+                    .style(theme::subdued_text)
+            } else {
+                container(Space::new())
+            },
+        ]
+        .spacing(16),
+        SurfaceKind::Raised,
+    );
+
+    let results: Option<Element<'a, Message>> = if result_count > 0 {
         let cards = items
             .into_iter()
             .enumerate()
-            .fold(column![].spacing(12), |column, (index, item)| {
+            .fold(column![].spacing(14), |column, (index, item)| {
                 column.push(result_card(index, item))
             });
 
-        scrollable(cards).height(Length::Fill).into()
+        Some(
+            column![
+                text("候选结果").size(20),
+                scrollable(cards).height(Length::Fill),
+            ]
+            .spacing(14)
+            .into(),
+        )
+    } else if loading || !status.trim().is_empty() {
+        Some(empty_state(loading, status))
+    } else {
+        None
     };
 
-    let mut content = column![
-        text("输入关键词、片段或意境，调用现有 AI 发现流程生成可导入的诗词候选。").size(14),
-        row![
-            text_input("输入关键词、片段或意境", &query).on_input(Message::DiscoveryQueryChanged),
-            button(search_label)
-                .style(button::primary)
-                .on_press(Message::SubmitDiscovery),
-        ]
-        .spacing(12),
-    ]
-    .spacing(16);
-
-    if loading || !status.trim().is_empty() {
-        content = content.push(
-            container(text(status_line(loading, &status)).size(14))
-                .padding(14)
-                .width(Length::Fill)
-                .style(container::rounded_box),
-        );
+    let mut body = column![search_panel].spacing(18);
+    if let Some(results) = results {
+        body = body.push(results);
     }
 
-    content = content.push(results);
-
     modal_frame(
-        modal_header("发现新诗词", Some("从关键词、诗句片段或意境生成可导入候选")),
-        scrollable(content).height(Length::Shrink),
-        Some(
-            row![
-                Space::new().width(Length::Fill),
-                button("关闭")
-                    .style(button::secondary)
-                    .on_press(Message::CloseModal),
-            ]
-            .spacing(12)
-            .into(),
-        ),
+        modal_header_with_close("发现新诗词", None, Message::CloseModal),
+        scrollable(body).height(Length::Shrink),
+        None,
     )
 }
 
@@ -79,46 +87,50 @@ fn result_card(index: usize, item: DiscoveryListItem) -> Element<'static, Messag
 
     let body = column![
         row![
-            column![text(item.title).size(18), text(metadata).size(13),].spacing(6),
+            column![
+                text(item.title).size(20),
+                container(text(metadata).size(13)).style(theme::subdued_text),
+            ]
+            .spacing(6),
             Space::new().width(Length::Fill),
-            text(item.relevance).size(13),
+            container(text(item.relevance).size(13)).style(theme::eyebrow_text),
         ]
-        .spacing(12),
+        .spacing(16)
+        .align_y(iced::Alignment::Start),
         text(item.excerpt.text).size(excerpt_size),
-        text(item.reason).size(14),
+        container(text(format!("推荐理由: {}", item.reason)).size(14)).style(theme::quiet_text),
         row![
             Space::new().width(Length::Fill),
-            button("导入到诗库")
-                .style(button::primary)
+            action_button("导入到诗库", ButtonKind::Primary)
                 .on_press(Message::ImportDiscovery(index)),
         ]
         .spacing(12),
     ]
-    .spacing(10);
+    .spacing(14);
 
-    container(body)
-        .padding(18)
-        .width(Length::Fill)
-        .style(container::rounded_box)
-        .into()
+    surface(body, SurfaceKind::Raised).into()
 }
 
-fn status_line(loading: bool, status: &str) -> String {
-    if loading {
-        "AI 正在搜索最匹配的诗词…".to_string()
+fn empty_state<'a>(loading: bool, status: &'a str) -> Element<'a, Message> {
+    let (title, detail) = empty_state_copy(loading, status);
+
+    let content = if let Some(detail) = detail {
+        column![
+            text(title).size(22),
+            container(text(detail).size(16)).style(theme::subdued_text),
+        ]
+        .spacing(14)
     } else {
-        status.to_string()
-    }
+        column![text(title).size(22)].spacing(0)
+    };
+
+    surface(content, SurfaceKind::Raised).into()
 }
 
-fn empty_state_text(query: &str, loading: bool, status: &str) -> String {
+fn empty_state_copy<'a>(loading: bool, status: &'a str) -> (&'a str, Option<&'a str>) {
     if loading {
-        "正在整理结果…".to_string()
-    } else if query.trim().is_empty() {
-        "输入关键词、诗句片段或意境，再开始一次 AI 搜索。".to_string()
-    } else if status.trim().is_empty() {
-        "没有可显示的结果，换个关键词再试。".to_string()
+        ("正在整理结果...", None)
     } else {
-        status.to_string()
+        ("当前没有可展示结果", Some(status))
     }
 }

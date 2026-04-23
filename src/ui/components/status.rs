@@ -17,7 +17,7 @@ pub fn status_chip<'a, Message: 'a>(
 ) -> Element<'a, Message> {
     widget::container(widget::text(label.into()).size(13))
         .padding([theme::SPACE_2, theme::SPACE_3])
-        .style(move |_| theme::chip_style(theme_tone(tone)))
+        .style(move |active_theme| theme::chip_style(active_theme, theme_tone(tone)))
         .into()
 }
 

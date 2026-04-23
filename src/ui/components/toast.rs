@@ -26,21 +26,22 @@ pub fn toast<'a, Message: 'a>(
 
     body = body.push(
         container(widget::text(message.into()).size(14))
-            .style(theme::subdued_text)
-            .width(Length::Shrink),
+            .style(theme::toast_message_text)
+            .width(Length::Fill),
     );
 
     let accent = widget::container(widget::Space::new().width(4))
-        .height(Length::Fill)
+        .height(56)
         .style(accent_style_for(tone));
 
     widget::container(
         widget::Row::new()
             .spacing(f32::from(theme::SPACE_3))
+            .align_y(iced::Alignment::Start)
             .push(accent)
             .push(widget::container(body).width(Length::Fill)),
     )
-    .width(Length::Shrink)
+    .width(320)
     .max_width(420)
     .padding(theme::SPACE_4)
     .style(theme::toast_surface)
@@ -78,19 +79,19 @@ fn accent_style_for(tone: ToastTone) -> fn(&iced::Theme) -> container::Style {
 }
 
 fn accent_info(_theme: &iced::Theme) -> container::Style {
-    accent_style(theme::ACCENT)
+    accent_style(_theme.palette().primary)
 }
 
 fn accent_success(_theme: &iced::Theme) -> container::Style {
-    accent_style(theme::SUCCESS)
+    accent_style(_theme.palette().success)
 }
 
 fn accent_warning(_theme: &iced::Theme) -> container::Style {
-    accent_style(theme::WARNING)
+    accent_style(_theme.palette().warning)
 }
 
 fn accent_danger(_theme: &iced::Theme) -> container::Style {
-    accent_style(theme::DANGER)
+    accent_style(_theme.palette().danger)
 }
 
 fn accent_style(color: iced::Color) -> container::Style {

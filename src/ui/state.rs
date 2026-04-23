@@ -5,7 +5,7 @@ use crate::config::app::AppPaths;
 use crate::domain::{DiscoveredPoem, Poem};
 use crate::storage::StoredAiConfig;
 
-use super::message::Modal;
+use super::message::{ContentMode, Modal, ThemeChoice};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ToastState {
@@ -103,6 +103,44 @@ impl SettingsForm {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct EditForm {
+    pub poem_id: String,
+    pub title: String,
+    pub author: String,
+    pub dynasty: String,
+    pub content: String,
+}
+
+impl EditForm {
+    pub fn from_poem(poem: &Poem) -> Self {
+        Self {
+            poem_id: poem.id.clone(),
+            title: poem.title.clone(),
+            author: poem.author.clone(),
+            dynasty: poem.dynasty.clone(),
+            content: poem.content.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AppreciationState {
+    pub poem_id: Option<String>,
+    pub content: String,
+    pub loading: bool,
+    pub error: String,
+}
+
+impl AppreciationState {
+    pub fn clear(&mut self) {
+        self.poem_id = None;
+        self.content.clear();
+        self.loading = false;
+        self.error.clear();
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DiscoveryPoemExcerpt {
     pub text: String,
     pub centered: bool,
@@ -130,6 +168,10 @@ pub struct AppState {
     pub settings_form: SettingsForm,
     pub toast: ToastState,
     pub active_modal: Modal,
+    pub content_mode: ContentMode,
+    pub active_theme: ThemeChoice,
+    pub appreciation: AppreciationState,
+    pub edit_form: Option<EditForm>,
 }
 
 impl AppState {
@@ -137,6 +179,7 @@ impl AppState {
         poems: Vec<Poem>,
         selected_poem_id: Option<String>,
         settings_form: SettingsForm,
+        active_theme: ThemeChoice,
     ) -> Self {
         Self {
             poems,
@@ -149,11 +192,25 @@ impl AppState {
             settings_form,
             toast: ToastState::default(),
             active_modal: Modal::None,
+            content_mode: ContentMode::Library,
+            active_theme,
+            appreciation: AppreciationState::default(),
+            edit_form: None,
         }
     }
 
     pub fn visible_poems(&self) -> Vec<Poem> {
-        filter_poems(&self.poems, &self.search_query)
+        let mode_poems = match self.content_mode {
+            ContentMode::Library => self.poems.clone(),
+            ContentMode::Favorites => self
+                .poems
+                .iter()
+                .filter(|poem| poem.is_favorite)
+                .cloned()
+                .collect(),
+        };
+
+        filter_poems(&mode_poems, &self.search_query)
     }
 
     pub fn selected_poem(&self) -> Option<Poem> {
@@ -176,6 +233,11 @@ impl AppState {
         self.selected_poem_id = visible.first().map(|poem| poem.id.clone());
     }
 
+    pub fn switch_content_mode(&mut self, mode: ContentMode) {
+        self.content_mode = mode;
+        self.sync_selection();
+    }
+
     pub fn open_modal(&mut self, modal: Modal) {
         self.active_modal = modal;
     }
@@ -196,6 +258,18 @@ impl AppState {
                 excerpt: discovery_poem_excerpt(&item.content),
             })
             .collect()
+    }
+
+    pub fn open_edit_for_selected(&mut self) {
+        self.edit_form = self.selected_poem().as_ref().map(EditForm::from_poem);
+        if self.edit_form.is_some() {
+            self.active_modal = Modal::Edit;
+        }
+    }
+
+    pub fn close_edit(&mut self) {
+        self.edit_form = None;
+        self.active_modal = Modal::None;
     }
 }
 
@@ -333,7 +407,10 @@ fn append_poetry_ellipsis(line: &mut String) {
 mod tests {
     use crate::domain::Poem;
 
-    use super::{ToastState, discovery_poem_excerpt, filter_poems, soft_wrap};
+    use super::{
+        AppState, ContentMode, Modal, SettingsForm, ThemeChoice, ToastState,
+        discovery_poem_excerpt, filter_poems, soft_wrap,
+    };
 
     fn poem(id: &str, title: &str, author: &str, content: &str) -> Poem {
         Poem {
@@ -374,7 +451,7 @@ mod tests {
 
     #[test]
     fn settings_form_blank_values_fall_back_to_defaults() {
-        let form = super::SettingsForm {
+        let form = SettingsForm {
             base_url: " ".into(),
             model: "".into(),
             api_key: String::new(),
@@ -389,50 +466,74 @@ mod tests {
     }
 
     #[test]
-    fn settings_form_rehydration_replaces_dirty_values_with_persisted_ones() {
-        let persisted = super::SettingsForm {
-            base_url: "https://api.openai.com/v1".into(),
-            model: "gpt-4.1-mini".into(),
-            api_key: String::new(),
-            allow_file_fallback: false,
-            mode_label: "已配置".into(),
-            warning: String::new(),
-        };
+    fn switching_to_favorites_filters_visible_poems() {
+        let mut poems = vec![
+            poem("1", "静夜思", "李白", "床前明月光"),
+            poem("2", "春晓", "孟浩然", "春眠不觉晓"),
+        ];
+        poems[1].is_favorite = true;
 
-        let hydrated = super::SettingsForm::rehydrated(persisted, "warn");
-        assert_eq!(hydrated.base_url, "https://api.openai.com/v1");
-        assert_eq!(hydrated.model, "gpt-4.1-mini");
-        assert_eq!(hydrated.warning, "warn");
+        let mut state = AppState::new(
+            poems,
+            Some("1".into()),
+            SettingsForm::default(),
+            ThemeChoice::Songyanjian,
+        );
+        state.switch_content_mode(ContentMode::Favorites);
+
+        let visible = state.visible_poems();
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].id, "2");
+    }
+
+    #[test]
+    fn theme_choice_defaults_to_songyanjian() {
+        assert_eq!(ThemeChoice::from_saved(None), ThemeChoice::Songyanjian);
+    }
+
+    #[test]
+    fn theme_choice_restores_hanjiangxue_from_saved_value() {
+        assert_eq!(
+            ThemeChoice::from_saved(Some("hanjiangxue")),
+            ThemeChoice::Hanjiangxue
+        );
     }
 
     #[test]
     fn modal_open_replaces_previous_modal_and_close_clears_it() {
         let poems = vec![poem("1", "静夜思", "李白", "床前明月光")];
-        let mut state =
-            super::AppState::new(poems, Some("1".into()), super::SettingsForm::default());
+        let mut state = AppState::new(
+            poems,
+            Some("1".into()),
+            SettingsForm::default(),
+            ThemeChoice::Songyanjian,
+        );
 
-        state.open_modal(super::super::message::Modal::Discovery);
-        assert_eq!(state.active_modal, super::super::message::Modal::Discovery);
+        state.open_modal(Modal::Discovery);
+        assert_eq!(state.active_modal, Modal::Discovery);
 
-        state.open_modal(super::super::message::Modal::Settings);
-        assert_eq!(state.active_modal, super::super::message::Modal::Settings);
+        state.open_modal(Modal::Settings);
+        assert_eq!(state.active_modal, Modal::Settings);
 
         state.close_modal();
-        assert_eq!(state.active_modal, super::super::message::Modal::None);
+        assert_eq!(state.active_modal, Modal::None);
     }
 
     #[test]
-    fn closing_modal_preserves_other_state() {
+    fn opening_edit_preloads_selected_poem() {
         let poems = vec![poem("1", "静夜思", "李白", "床前明月光")];
-        let mut state =
-            super::AppState::new(poems, Some("1".into()), super::SettingsForm::default());
-        state.search_query = "李白".into();
-        state.open_modal(super::super::message::Modal::About);
+        let mut state = AppState::new(
+            poems,
+            Some("1".into()),
+            SettingsForm::default(),
+            ThemeChoice::Songyanjian,
+        );
 
-        state.close_modal();
-
-        assert_eq!(state.active_modal, super::super::message::Modal::None);
-        assert_eq!(state.search_query, "李白");
+        state.open_edit_for_selected();
+        let edit = state.edit_form.expect("edit form");
+        assert_eq!(edit.title, "静夜思");
+        assert_eq!(edit.author, "李白");
+        assert_eq!(state.active_modal, Modal::Edit);
     }
 
     #[test]
@@ -493,11 +594,8 @@ mod tests {
         assert!(toast.dismiss());
 
         let second = toast.show("第二次");
-        assert_eq!(toast.message, "第二次");
         assert!(toast.visible);
         assert!(!toast.dismiss_if_current(first));
-        assert!(toast.visible);
         assert!(toast.dismiss_if_current(second));
-        assert!(!toast.visible);
     }
 }

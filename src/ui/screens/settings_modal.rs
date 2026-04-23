@@ -1,14 +1,13 @@
-use iced::widget::{Space, button, checkbox, column, container, row, scrollable, text, text_input};
+use iced::widget::{Space, checkbox, column, container, row, scrollable, text, text_input};
 use iced::{Element, Length};
 
-use crate::ui::components::{modal_frame, modal_header};
+use crate::ui::components::{ButtonKind, action_button, modal_frame, modal_header_with_close};
 use crate::ui::message::Message;
 use crate::ui::state::SettingsForm;
 
 pub fn view<'a>(form: &'a SettingsForm) -> Element<'a, Message> {
-    let content = column![
+    let mut content = column![
         text(format!("当前模式：{}", form.mode_label)).size(14),
-        status_block(form),
         field(
             "Base URL",
             text_input("https://api.openai.com/v1", &form.base_url)
@@ -30,58 +29,35 @@ pub fn view<'a>(form: &'a SettingsForm) -> Element<'a, Message> {
         .padding(16)
         .width(Length::Fill)
         .style(container::rounded_box),
-        row![
-            button("清除 Key")
-                .style(button::danger)
-                .on_press(Message::ClearApiKey),
-            Space::new().width(Length::Fill),
-            button("保存设置")
-                .style(button::primary)
-                .on_press(Message::SaveSettings),
-        ]
-        .spacing(12),
     ]
     .spacing(16);
 
+    if !form.warning.trim().is_empty() {
+        content = content.push(
+            container(text(form.warning.as_str()).size(13))
+                .padding(16)
+                .width(Length::Fill)
+                .style(container::rounded_box),
+        );
+    }
+
     modal_frame(
-        modal_header("AI 设置", Some("管理模型、Base URL 与 API Key 持久化行为")),
+        modal_header_with_close("AI 设置", None, Message::CloseModal),
         scrollable(content).height(Length::Shrink),
         Some(
             row![
-                button("清除 Key")
-                    .style(button::danger)
+                action_button("清除 Key", ButtonKind::Danger)
+                    .width(128)
                     .on_press(Message::ClearApiKey),
                 Space::new().width(Length::Fill),
-                button("关闭")
-                    .style(button::secondary)
-                    .on_press(Message::CloseModal),
-                button("保存设置")
-                    .style(button::primary)
+                action_button("保存设置", ButtonKind::Primary)
+                    .width(140)
                     .on_press(Message::SaveSettings),
             ]
             .spacing(12)
             .into(),
         ),
     )
-}
-
-fn status_block<'a>(form: &'a SettingsForm) -> Element<'a, Message> {
-    let mut block = column![];
-
-    if !form.warning.trim().is_empty() {
-        block = block.push(text(form.warning.as_str()).size(13));
-    } else {
-        block = block.push(
-            text("Base URL、模型与密钥会复用现有配置持久化逻辑。API Key 留空时不会覆盖已保存的凭据。")
-                .size(14),
-        );
-    }
-
-    container(block.spacing(8))
-        .padding(16)
-        .width(Length::Fill)
-        .style(container::rounded_box)
-        .into()
 }
 
 fn field<'a>(label: &'a str, input: impl Into<Element<'a, Message>>) -> Element<'a, Message> {

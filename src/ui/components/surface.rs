@@ -11,6 +11,7 @@ pub enum SurfaceKind {
     Raised,
     Accent,
     Outline,
+    Appreciation,
 }
 
 pub fn page_shell<'a, Message: 'a>(
@@ -35,7 +36,7 @@ pub fn nav_surface<'a, Message: 'a>(
     widget::container(content)
         .width(Length::Fill)
         .padding(theme::SPACE_4)
-        .style(theme::accent_panel)
+        .style(theme::sidebar_panel)
 }
 
 pub fn surface<'a, Message: 'a>(
@@ -68,5 +69,6 @@ fn style_for(kind: SurfaceKind) -> fn(&iced::Theme) -> widget::container::Style 
         SurfaceKind::Raised => theme::raised_panel,
         SurfaceKind::Accent => theme::accent_panel,
         SurfaceKind::Outline => theme::outline_panel,
+        SurfaceKind::Appreciation => theme::appreciation_panel,
     }
 }
