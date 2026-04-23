@@ -2,7 +2,10 @@ use std::time::Duration;
 
 use anyhow::Result;
 use iced::widget::{Space, button, column, container, mouse_area, row, scrollable, text};
-use iced::{Alignment, Color, Element, Length, Size, Task, Theme, alignment, mouse, window};
+use iced::{
+    Alignment, Color, Element, Length, Size, Subscription, Task, Theme, alignment, mouse, system,
+    window,
+};
 use tracing_subscriber::EnvFilter;
 
 use crate::config::app::AppPaths;
@@ -27,6 +30,7 @@ pub fn run() -> Result<()> {
         .try_init();
 
     iced::application(PoemApp::new, PoemApp::update, PoemApp::view)
+        .subscription(PoemApp::subscription)
         .theme(PoemApp::theme)
         .window(window::Settings {
             size: Size::new(1460.0, 920.0),
@@ -67,11 +71,15 @@ impl PoemApp {
         };
         app.refresh_cached_appreciation();
 
-        (app, Task::none())
+        (app, system::theme().map(Message::SystemThemeChanged))
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        system::theme_changes().map(Message::SystemThemeChanged)
     }
 
     fn theme(&self) -> Theme {
-        theme::app_theme(self.state.active_theme)
+        theme::app_theme(self.state.resolved_theme())
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -98,6 +106,7 @@ impl PoemApp {
                 Task::none()
             }
             Message::OpenModal(modal) => {
+                self.state.close_theme_panel();
                 match modal {
                     Modal::Settings => {
                         self.state.settings_form = SettingsForm::rehydrated(
@@ -112,6 +121,7 @@ impl PoemApp {
                 Task::none()
             }
             Message::CloseModal => {
+                self.state.close_theme_panel();
                 if self.state.active_modal == Modal::Edit {
                     self.state.close_edit();
                 } else {
@@ -270,6 +280,7 @@ impl PoemApp {
                 }
             },
             Message::OpenEditModal => {
+                self.state.close_theme_panel();
                 self.state.open_edit_for_selected();
                 Task::none()
             }
@@ -354,9 +365,22 @@ impl PoemApp {
                 }
                 Task::none()
             }
+            Message::ToggleThemePanel => {
+                self.state.toggle_theme_panel();
+                Task::none()
+            }
+            Message::CloseThemePanel => {
+                self.state.close_theme_panel();
+                Task::none()
+            }
             Message::SwitchTheme(choice) => {
                 self.state.active_theme = choice;
+                self.state.close_theme_panel();
                 let _ = self.db.save_theme_preference(choice.as_str());
+                Task::none()
+            }
+            Message::SystemThemeChanged(mode) => {
+                self.state.system_theme_mode = mode;
                 Task::none()
             }
             Message::DismissToast => {
@@ -417,9 +441,17 @@ impl PoemApp {
             }
         };
 
+        let with_theme_backdrop: Element<'_, Message> = if self.state.theme_panel_open {
+            mouse_area(with_modal)
+                .on_press(Message::CloseThemePanel)
+                .into()
+        } else {
+            with_modal
+        };
+
         if self.state.toast.visible {
             toast_host(
-                with_modal,
+                with_theme_backdrop,
                 Some(
                     mouse_area(toast(
                         Some("提示"),
@@ -431,7 +463,7 @@ impl PoemApp {
                 ),
             )
         } else {
-            with_modal
+            with_theme_backdrop
         }
     }
 
@@ -471,25 +503,27 @@ impl PoemApp {
         ]
         .spacing(12);
 
-        let theme_switch = row![
-            sidebar_theme_button(
-                ICON_BRUSH,
-                "松烟笺",
-                self.state.active_theme == ThemeChoice::Songyanjian
+        let theme_picker: Element<'_, Message> = if self.state.theme_panel_open {
+            column![
+                theme_options_panel(self.state.active_theme),
+                theme_trigger_button(
+                    self.state.active_theme.display_name(),
+                    self.state.theme_panel_open,
+                ),
+            ]
+            .spacing(10)
+            .width(Length::Fill)
+            .into()
+        } else {
+            theme_trigger_button(
+                self.state.active_theme.display_name(),
+                self.state.theme_panel_open,
             )
-            .on_press(Message::SwitchTheme(ThemeChoice::Songyanjian)),
-            sidebar_theme_button(
-                ICON_SNOWFLAKE,
-                "寒江雪",
-                self.state.active_theme == ThemeChoice::Hanjiangxue
-            )
-            .on_press(Message::SwitchTheme(ThemeChoice::Hanjiangxue)),
-        ]
-        .spacing(12);
+            .into()
+        };
 
         let footer = column![
-            container(text("主题").size(13)).style(theme::sidebar_section_label),
-            theme_switch,
+            container(theme_picker).width(Length::Fill),
             sidebar_divider::<Message>(),
             sidebar_nav_button(
                 ICON_SETTINGS,
@@ -560,7 +594,7 @@ impl PoemApp {
         };
 
         let favorite_hovered = self.state.hovered_detail_tool == Some(DetailTool::Favorite);
-        let is_light_theme = matches!(self.state.active_theme, ThemeChoice::Songyanjian);
+        let is_light_theme = matches!(self.state.resolved_theme(), ThemeChoice::Songyanjian);
         let favorite_icon = if poem.is_favorite {
             ICON_FAVORITE_FILLED
         } else {
@@ -716,8 +750,7 @@ const ICON_FAVORITE: &str = "assets/icons/favorite-outline.svg";
 const ICON_FAVORITE_FILLED: &str = "assets/icons/favorite-filled.svg";
 const ICON_ABOUT: &str = "assets/icons/about.svg";
 const ICON_SETTINGS: &str = "assets/icons/settings.svg";
-const ICON_BRUSH: &str = "assets/icons/brush.svg";
-const ICON_SNOWFLAKE: &str = "assets/icons/snowflake.svg";
+const ICON_THEME: &str = "assets/icons/theme.svg";
 const ICON_EDIT: &str = "assets/icons/edit.svg";
 const ICON_APPRECIATION: &str = "assets/icons/appreciation.svg";
 
@@ -725,7 +758,6 @@ const ICON_APPRECIATION: &str = "assets/icons/appreciation.svg";
 enum SidebarIconTone {
     Accent,
     Default,
-    Muted,
     Inverse,
 }
 
@@ -795,36 +827,64 @@ fn sidebar_nav_button<'a>(
     })
 }
 
-fn sidebar_theme_button<'a>(
-    icon_path: &'static str,
-    label: &'a str,
-    selected: bool,
-) -> button::Button<'a, Message> {
-    let icon_tone = if selected {
-        SidebarIconTone::Inverse
+fn theme_trigger_button<'a>(current_label: &'a str, open: bool) -> button::Button<'a, Message> {
+    let icon_tone = if open {
+        SidebarIconTone::Accent
     } else {
-        SidebarIconTone::Muted
+        SidebarIconTone::Default
     };
 
     button(
         container(
             row![
-                sidebar_icon::<Message>(icon_path, 18.0, icon_tone),
-                text(label).size(15),
+                sidebar_icon::<Message>(ICON_THEME, 18.0, icon_tone),
+                text("主题").size(15),
+                Space::new().width(Length::Fill),
+                text(current_label).size(12),
             ]
-            .spacing(10)
+            .spacing(8)
             .align_y(Alignment::Center),
         )
-        .width(Length::Fill)
-        .center_x(Length::Fill),
+        .width(Length::Fill),
     )
     .width(Length::Fill)
-    .padding([14, 16])
-    .style(if selected {
-        theme::button_sidebar_theme_active
-    } else {
-        theme::button_sidebar_theme
-    })
+    .padding([12, 14])
+    .style(theme::button_sidebar_nav)
+    .on_press(Message::ToggleThemePanel)
+}
+
+fn theme_options_panel<'a>(selected: ThemeChoice) -> iced::widget::Column<'a, Message> {
+    let options = [
+        ThemeChoice::Songyanjian,
+        ThemeChoice::Hanjiangxue,
+        ThemeChoice::FollowSystem,
+    ];
+
+    options.into_iter().fold(
+        column!().spacing(8).width(Length::Fill),
+        |column, choice| column.push(theme_option_button(choice, selected)),
+    )
+}
+
+fn theme_option_button<'a>(choice: ThemeChoice, selected: ThemeChoice) -> Element<'a, Message> {
+    container(
+        button(
+            container(text(choice.display_name()).size(14))
+                .width(Length::Fill)
+                .padding([0, 4]),
+        )
+        .width(Length::Fill)
+        .padding([10, 14])
+        .style(if choice == selected {
+            theme::button_sidebar_theme_active
+        } else {
+            theme::button_sidebar_theme
+        })
+        .on_press(Message::SwitchTheme(choice)),
+    )
+    .width(Length::Fill)
+    .padding([0, 34])
+    .into()
 }
 
 fn detail_icon_action<'a>(
@@ -884,7 +944,6 @@ fn sidebar_icon_color(theme: &Theme, tone: SidebarIconTone) -> Color {
                 tokens.title
             }
         }
-        SidebarIconTone::Muted => tokens.text_muted,
         SidebarIconTone::Inverse => Color::from_rgb8(0xFF, 0xF8, 0xF2),
     }
 }

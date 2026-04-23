@@ -4,7 +4,7 @@ use crate::config::ai::{
 use crate::config::app::AppPaths;
 use crate::domain::{DiscoveredPoem, Poem};
 use crate::storage::StoredAiConfig;
-use iced::widget::text_editor;
+use iced::{theme, widget::text_editor};
 
 use super::message::{ContentMode, DetailTool, Modal, ThemeChoice};
 
@@ -191,6 +191,8 @@ pub struct AppState {
     pub active_modal: Modal,
     pub content_mode: ContentMode,
     pub active_theme: ThemeChoice,
+    pub system_theme_mode: theme::Mode,
+    pub theme_panel_open: bool,
     pub appreciation: AppreciationState,
     pub edit_form: Option<EditForm>,
     pub hovered_detail_tool: Option<DetailTool>,
@@ -216,6 +218,8 @@ impl AppState {
             active_modal: Modal::None,
             content_mode: ContentMode::Library,
             active_theme,
+            system_theme_mode: theme::Mode::default(),
+            theme_panel_open: false,
             appreciation: AppreciationState::default(),
             edit_form: None,
             hovered_detail_tool: None,
@@ -267,6 +271,18 @@ impl AppState {
 
     pub fn close_modal(&mut self) {
         self.active_modal = Modal::None;
+    }
+
+    pub fn resolved_theme(&self) -> ThemeChoice {
+        self.active_theme.resolve(self.system_theme_mode)
+    }
+
+    pub fn toggle_theme_panel(&mut self) {
+        self.theme_panel_open = !self.theme_panel_open;
+    }
+
+    pub fn close_theme_panel(&mut self) {
+        self.theme_panel_open = false;
     }
 
     pub fn discovery_items(&self) -> Vec<DiscoveryListItem> {
@@ -429,6 +445,7 @@ fn append_poetry_ellipsis(line: &mut String) {
 #[cfg(test)]
 mod tests {
     use crate::domain::Poem;
+    use iced::theme::Mode;
 
     use super::{
         AppState, ContentMode, Modal, SettingsForm, ThemeChoice, ToastState,
@@ -520,6 +537,58 @@ mod tests {
             ThemeChoice::from_saved(Some("hanjiangxue")),
             ThemeChoice::Hanjiangxue
         );
+    }
+
+    #[test]
+    fn theme_choice_restores_follow_system_from_saved_value() {
+        assert_eq!(
+            ThemeChoice::from_saved(Some("system")),
+            ThemeChoice::FollowSystem
+        );
+    }
+
+    #[test]
+    fn invalid_theme_choice_falls_back_to_songyanjian() {
+        assert_eq!(
+            ThemeChoice::from_saved(Some("unexpected")),
+            ThemeChoice::Songyanjian
+        );
+    }
+
+    #[test]
+    fn resolved_theme_tracks_system_mode_when_following_system() {
+        let mut state = AppState::new(
+            vec![poem("1", "静夜思", "李白", "床前明月光")],
+            Some("1".into()),
+            SettingsForm::default(),
+            ThemeChoice::FollowSystem,
+        );
+
+        state.system_theme_mode = Mode::Light;
+        assert_eq!(state.resolved_theme(), ThemeChoice::Songyanjian);
+
+        state.system_theme_mode = Mode::Dark;
+        assert_eq!(state.resolved_theme(), ThemeChoice::Hanjiangxue);
+    }
+
+    #[test]
+    fn theme_panel_toggle_and_close_behave_as_expected() {
+        let mut state = AppState::new(
+            vec![poem("1", "静夜思", "李白", "床前明月光")],
+            Some("1".into()),
+            SettingsForm::default(),
+            ThemeChoice::Songyanjian,
+        );
+
+        assert!(!state.theme_panel_open);
+        state.toggle_theme_panel();
+        assert!(state.theme_panel_open);
+        state.toggle_theme_panel();
+        assert!(!state.theme_panel_open);
+
+        state.toggle_theme_panel();
+        state.close_theme_panel();
+        assert!(!state.theme_panel_open);
     }
 
     #[test]

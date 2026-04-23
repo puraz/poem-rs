@@ -65,7 +65,7 @@ pub struct Tokens {
 
 pub fn app_theme(choice: ThemeChoice) -> Theme {
     let palette = match choice {
-        ThemeChoice::Songyanjian => Palette {
+        ThemeChoice::Songyanjian | ThemeChoice::FollowSystem => Palette {
             background: color(0xF9F6F0),
             text: color(0x4A4440),
             primary: color(0xC45A4A),
@@ -253,6 +253,16 @@ pub fn library_item_selected_panel(theme: &Theme) -> container::Style {
 
 pub fn outline_panel(theme: &Theme) -> container::Style {
     surface_style(theme, SurfaceKind::Outline)
+}
+
+pub fn theme_menu_panel(theme: &Theme) -> container::Style {
+    container::Style {
+        text_color: Some(tokens(theme).text),
+        background: Some(Background::Color(Color::TRANSPARENT)),
+        border: border(Color::TRANSPARENT, 0.0, 0.0),
+        shadow: Shadow::default(),
+        snap: false,
+    }
 }
 
 pub fn modal_backdrop(theme: &Theme) -> container::Style {
@@ -590,6 +600,42 @@ pub fn button_sidebar_theme_active(theme: &Theme, status: button::Status) -> but
         background: Some(Background::Color(background)),
         text_color: color(0xFFF8F2),
         border: border(Color::TRANSPARENT, 0.0, 14.0),
+        shadow: Shadow::default(),
+        snap: false,
+    }
+}
+
+pub fn button_theme_menu(theme: &Theme, status: button::Status) -> button::Style {
+    let t = tokens(theme);
+    let background = match status {
+        button::Status::Active => Color::TRANSPARENT,
+        button::Status::Hovered => tint(t.primary, if is_light(theme) { 0.04 } else { 0.08 }),
+        button::Status::Pressed => tint(t.primary, if is_light(theme) { 0.07 } else { 0.12 }),
+        button::Status::Disabled => Color::TRANSPARENT,
+    };
+
+    button::Style {
+        background: Some(Background::Color(background)),
+        text_color: if is_light(theme) { t.title } else { t.text },
+        border: border(Color::TRANSPARENT, 0.0, 6.0),
+        shadow: Shadow::default(),
+        snap: false,
+    }
+}
+
+pub fn button_theme_menu_active(theme: &Theme, status: button::Status) -> button::Style {
+    let t = tokens(theme);
+    let background = match status {
+        button::Status::Active => tint(t.primary, if is_light(theme) { 0.08 } else { 0.14 }),
+        button::Status::Hovered => tint(t.primary, if is_light(theme) { 0.11 } else { 0.18 }),
+        button::Status::Pressed => tint(t.primary, if is_light(theme) { 0.14 } else { 0.22 }),
+        button::Status::Disabled => tint(t.primary, if is_light(theme) { 0.05 } else { 0.10 }),
+    };
+
+    button::Style {
+        background: Some(Background::Color(background)),
+        text_color: t.primary,
+        border: border(Color::TRANSPARENT, 0.0, 6.0),
         shadow: Shadow::default(),
         snap: false,
     }

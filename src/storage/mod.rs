@@ -622,6 +622,13 @@ mod tests {
             Some("songyanjian".to_string())
         );
 
+        db.save_theme_preference("system")
+            .expect("save system theme");
+        assert_eq!(
+            db.load_theme_preference().expect("load system theme"),
+            Some("system".to_string())
+        );
+
         let _ = std::fs::remove_file(path);
     }
 
