@@ -256,10 +256,17 @@ pub fn outline_panel(theme: &Theme) -> container::Style {
 }
 
 pub fn theme_menu_panel(theme: &Theme) -> container::Style {
+    let t = tokens(theme);
+    let (background, border_color) = if is_light(theme) {
+        (color(0xF5F0EA), color(0xE2D8CD))
+    } else {
+        (color(0x2F2F2F), Color::from_rgba8(229, 211, 176, 0.10))
+    };
+
     container::Style {
-        text_color: Some(tokens(theme).text),
-        background: Some(Background::Color(Color::TRANSPARENT)),
-        border: border(Color::TRANSPARENT, 0.0, 0.0),
+        text_color: Some(t.text),
+        background: Some(Background::Color(background)),
+        border: border(border_color, 1.0, 8.0),
         shadow: Shadow::default(),
         snap: false,
     }
@@ -562,26 +569,26 @@ pub fn button_sidebar_nav_active(theme: &Theme, status: button::Status) -> butto
 
 pub fn button_sidebar_theme(theme: &Theme, status: button::Status) -> button::Style {
     let t = tokens(theme);
-    let (background, border_color, text_color) = if is_light(theme) {
+    let (background, text_color) = if is_light(theme) {
         match status {
-            button::Status::Active => (color(0xFFFFFF), color(0xE8DED4), color(0x6E655C)),
-            button::Status::Hovered => (color(0xFCFAF7), color(0xE3D8CD), color(0x5C544D)),
-            button::Status::Pressed => (color(0xF7F2EC), color(0xDDD1C5), color(0x544C45)),
-            button::Status::Disabled => (color(0xFAF8F4), color(0xEEE7DF), color(0xAAA096)),
+            button::Status::Active => (Color::TRANSPARENT, color(0x6E655C)),
+            button::Status::Hovered => (color(0xEEE7DE), color(0x5C544D)),
+            button::Status::Pressed => (color(0xE8DED2), color(0x544C45)),
+            button::Status::Disabled => (Color::TRANSPARENT, color(0xAAA096)),
         }
     } else {
         match status {
-            button::Status::Active => (t.pane_soft, t.line_strong, t.text_muted),
-            button::Status::Hovered => (lift(t.pane_soft, 0.03), t.line_strong, t.text),
-            button::Status::Pressed => (deepen(t.pane_soft, 0.03), t.line_strong, t.text),
-            button::Status::Disabled => (t.pane, t.line_subtle, t.text_soft),
+            button::Status::Active => (Color::TRANSPARENT, t.text_muted),
+            button::Status::Hovered => (Color::from_rgba8(255, 255, 255, 0.04), t.text),
+            button::Status::Pressed => (Color::from_rgba8(255, 255, 255, 0.07), t.text),
+            button::Status::Disabled => (Color::TRANSPARENT, t.text_soft),
         }
     };
 
     button::Style {
         background: Some(Background::Color(background)),
         text_color,
-        border: border(border_color, 1.0, 14.0),
+        border: border(Color::TRANSPARENT, 0.0, 6.0),
         shadow: Shadow::default(),
         snap: false,
     }
@@ -590,16 +597,20 @@ pub fn button_sidebar_theme(theme: &Theme, status: button::Status) -> button::St
 pub fn button_sidebar_theme_active(theme: &Theme, status: button::Status) -> button::Style {
     let t = tokens(theme);
     let background = match status {
-        button::Status::Active => t.primary,
-        button::Status::Hovered => lift(t.primary, 0.04),
-        button::Status::Pressed => deepen(t.primary, 0.04),
-        button::Status::Disabled => tint(t.primary, 0.28),
+        button::Status::Active => tint(t.primary, if is_light(theme) { 0.12 } else { 0.18 }),
+        button::Status::Hovered => tint(t.primary, if is_light(theme) { 0.16 } else { 0.22 }),
+        button::Status::Pressed => tint(t.primary, if is_light(theme) { 0.20 } else { 0.26 }),
+        button::Status::Disabled => tint(t.primary, if is_light(theme) { 0.08 } else { 0.12 }),
     };
 
     button::Style {
         background: Some(Background::Color(background)),
-        text_color: color(0xFFF8F2),
-        border: border(Color::TRANSPARENT, 0.0, 14.0),
+        text_color: if is_light(theme) {
+            color(0x8F4A3E)
+        } else {
+            color(0xF0D4CE)
+        },
+        border: border(Color::TRANSPARENT, 0.0, 6.0),
         shadow: Shadow::default(),
         snap: false,
     }

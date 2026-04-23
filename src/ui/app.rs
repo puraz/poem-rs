@@ -853,38 +853,44 @@ fn theme_trigger_button<'a>(current_label: &'a str, open: bool) -> button::Butto
     .on_press(Message::ToggleThemePanel)
 }
 
-fn theme_options_panel<'a>(selected: ThemeChoice) -> iced::widget::Column<'a, Message> {
+fn theme_options_panel<'a>(selected: ThemeChoice) -> Element<'a, Message> {
     let options = [
         ThemeChoice::Songyanjian,
         ThemeChoice::Hanjiangxue,
         ThemeChoice::FollowSystem,
     ];
 
-    options.into_iter().fold(
-        column!().spacing(8).width(Length::Fill),
-        |column, choice| column.push(theme_option_button(choice, selected)),
-    )
-}
-
-fn theme_option_button<'a>(choice: ThemeChoice, selected: ThemeChoice) -> Element<'a, Message> {
     container(
-        button(
-            container(text(choice.display_name()).size(14))
-                .width(Length::Fill)
-                .padding([0, 4]),
-        )
-        .width(Length::Fill)
-        .padding([10, 14])
-        .style(if choice == selected {
-            theme::button_sidebar_theme_active
-        } else {
-            theme::button_sidebar_theme
-        })
-        .on_press(Message::SwitchTheme(choice)),
+        container(options.into_iter().fold(
+            column!().spacing(0).width(Length::Fill),
+            |column, choice| column.push(theme_option_button(choice, selected)),
+        ))
+        .width(Length::Fixed(136.0))
+        .padding(4)
+        .style(theme::theme_menu_panel),
     )
     .width(Length::Fill)
-    .padding([0, 34])
+    .align_x(alignment::Horizontal::Right)
     .into()
+}
+
+fn theme_option_button<'a>(
+    choice: ThemeChoice,
+    selected: ThemeChoice,
+) -> button::Button<'a, Message> {
+    button(
+        container(text(choice.display_name()).size(14))
+            .width(Length::Fill)
+            .padding([0, 2]),
+    )
+    .width(Length::Fill)
+    .padding([9, 12])
+    .style(if choice == selected {
+        theme::button_sidebar_theme_active
+    } else {
+        theme::button_sidebar_theme
+    })
+    .on_press(Message::SwitchTheme(choice))
 }
 
 fn detail_icon_action<'a>(
