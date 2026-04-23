@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, scrollable, text};
+use iced::widget::{button, column, container, row, scrollable, text};
 use iced::{Element, Fill, Length};
 
 use crate::domain::Poem;
@@ -22,27 +22,50 @@ pub fn view<'a>(
             let title = poem.title.clone();
             let meta = poem.metadata();
             let snippet = poem.snippet();
+            let is_favorite = poem.is_favorite;
+
+            let favorite_icon = if is_favorite {
+                text("★").size(18)
+            } else {
+                text("☆").size(18)
+            };
 
             let card = container(
-                column![
-                    text(title).size(if selected { 26 } else { 23 }),
-                    container(text(meta).size(14)).style(move |active_theme| {
+                row![
+                    column![
+                        text(title).size(if selected { 26 } else { 23 }),
+                        container(text(meta).size(14)).style(move |active_theme| {
+                            if selected {
+                                theme::library_item_meta_selected(active_theme)
+                            } else {
+                                theme::subdued_text(active_theme)
+                            }
+                        }),
+                        container(text(snippet).size(15)).style(move |active_theme| {
+                            if selected {
+                                theme::library_item_snippet_selected(active_theme)
+                            } else {
+                                theme::quiet_text(active_theme)
+                            }
+                        }),
+                    ]
+                    .spacing(10)
+                    .width(Length::Fill),
+                    container(
+                        row![favorite_icon, text("›").size(22),]
+                            .spacing(8)
+                            .align_y(iced::Alignment::Center),
+                    )
+                    .style(move |active_theme| {
                         if selected {
                             theme::library_item_meta_selected(active_theme)
                         } else {
                             theme::subdued_text(active_theme)
                         }
                     }),
-                    container(text(snippet).size(15)).style(move |active_theme| {
-                        if selected {
-                            theme::library_item_snippet_selected(active_theme)
-                        } else {
-                            theme::quiet_text(active_theme)
-                        }
-                    }),
                 ]
-                .spacing(10)
-                .width(Length::Fill),
+                .spacing(12)
+                .align_y(iced::Alignment::Center),
             )
             .padding([18, 22])
             .width(Length::Fill)

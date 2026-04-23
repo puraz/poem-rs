@@ -1,16 +1,16 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use iced::widget::{column, container, mouse_area, row, text};
-use iced::{Element, Length, Size, Task, Theme, window};
+use iced::widget::{Space, button, column, container, mouse_area, row, text};
+use iced::{Alignment, Color, Element, Length, Size, Task, Theme, window};
 use tracing_subscriber::EnvFilter;
 
 use crate::config::app::AppPaths;
 use crate::storage::{AppDatabase, StoredAiConfig};
 
 use super::components::{
-    ButtonKind, SurfaceKind, ToastTone, action_button, compact_button, modal_overlay, nav_button,
-    nav_surface, page_shell, section_surface, surface, toast, toast_host,
+    ButtonKind, SurfaceKind, ToastTone, action_button, compact_button, modal_overlay, nav_surface,
+    page_shell, section_surface, surface, toast, toast_host,
 };
 use super::message::{ContentMode, Message, Modal, ThemeChoice};
 use super::screens::{about_modal, discovery_modal, edit_modal, library, settings_modal};
@@ -427,48 +427,74 @@ impl PoemApp {
     }
 
     fn sidebar_view(&self) -> Element<'_, Message> {
+        let header = column![
+            row![
+                sidebar_icon::<Message>(ICON_BRAND, 30.0, SidebarIconTone::Accent),
+                column![
+                    container(text("诗词").size(22)).style(theme::title_text),
+                    container(text("发现诗意之美").size(13)).style(theme::subdued_text),
+                ]
+                .spacing(6),
+            ]
+            .spacing(14)
+            .align_y(Alignment::Center),
+            sidebar_divider::<Message>(),
+        ]
+        .spacing(18);
+
+        let main_nav = column![
+            sidebar_primary_button(ICON_PLUS, "发现新诗词")
+                .on_press(Message::OpenModal(Modal::Discovery)),
+            sidebar_nav_button(
+                ICON_HOME,
+                "首页",
+                self.state.content_mode == ContentMode::Library
+            )
+            .on_press(Message::SwitchContentMode(ContentMode::Library)),
+            sidebar_nav_button(
+                ICON_FAVORITE,
+                "收藏夹",
+                self.state.content_mode == ContentMode::Favorites
+            )
+            .on_press(Message::SwitchContentMode(ContentMode::Favorites)),
+            sidebar_nav_button(ICON_ABOUT, "关于", self.state.active_modal == Modal::About)
+                .on_press(Message::OpenModal(Modal::About)),
+        ]
+        .spacing(12);
+
         let theme_switch = row![
-            compact_button(
+            sidebar_theme_button(
+                ICON_BRUSH,
                 "松烟笺",
-                if self.state.active_theme == ThemeChoice::Songyanjian {
-                    ButtonKind::NavActive
-                } else {
-                    ButtonKind::Ghost
-                }
+                self.state.active_theme == ThemeChoice::Songyanjian
             )
             .on_press(Message::SwitchTheme(ThemeChoice::Songyanjian)),
-            compact_button(
+            sidebar_theme_button(
+                ICON_SNOWFLAKE,
                 "寒江雪",
-                if self.state.active_theme == ThemeChoice::Hanjiangxue {
-                    ButtonKind::NavActive
-                } else {
-                    ButtonKind::Ghost
-                }
+                self.state.active_theme == ThemeChoice::Hanjiangxue
             )
             .on_press(Message::SwitchTheme(ThemeChoice::Hanjiangxue)),
         ]
-        .spacing(8);
+        .spacing(12);
+
+        let footer = column![
+            container(text("主题").size(13)).style(theme::sidebar_section_label),
+            theme_switch,
+            sidebar_divider::<Message>(),
+            sidebar_nav_button(
+                ICON_SETTINGS,
+                "设置",
+                self.state.active_modal == Modal::Settings
+            )
+            .on_press(Message::OpenModal(Modal::Settings)),
+        ]
+        .spacing(16);
 
         nav_surface(
-            column![
-                action_button("发现新诗词", ButtonKind::Primary)
-                    .width(Length::Fill)
-                    .on_press(Message::OpenModal(Modal::Discovery)),
-                nav_button("首页", self.state.content_mode == ContentMode::Library)
-                    .on_press(Message::SwitchContentMode(ContentMode::Library)),
-                nav_button("收藏夹", self.state.content_mode == ContentMode::Favorites)
-                    .on_press(Message::SwitchContentMode(ContentMode::Favorites)),
-                nav_button("关于", self.state.active_modal == Modal::About)
-                    .on_press(Message::OpenModal(Modal::About)),
-                iced::widget::Space::new().height(Length::Fill),
-                text("主题").size(13),
-                theme_switch,
-                nav_button("设置", self.state.active_modal == Modal::Settings)
-                    .on_press(Message::OpenModal(Modal::Settings)),
-            ]
-            .spacing(16),
+            column![header, main_nav, Space::new().height(Length::Fill), footer,].spacing(0),
         )
-        .width(280)
+        .width(296)
         .height(Length::Fill)
         .into()
     }
@@ -502,7 +528,7 @@ impl PoemApp {
         };
 
         let favorite_label = if poem.is_favorite {
-            "★ 收藏中"
+            "★ 已收藏"
         } else {
             "☆ 收藏"
         };
@@ -526,6 +552,14 @@ impl PoemApp {
             container(iced::widget::Space::new()).into()
         };
 
+        let ai_button = container(
+            action_button("✨ AI 赏析", ButtonKind::Primary)
+                .width(Length::Fill)
+                .on_press(Message::RequestAppreciation),
+        )
+        .width(Length::Fill)
+        .center_x(Length::Fill);
+
         section_surface(
             "阅读",
             column![
@@ -540,18 +574,13 @@ impl PoemApp {
                         }
                     )
                     .on_press(Message::ToggleFavorite),
-                    compact_button("✎ 编辑", ButtonKind::Secondary)
-                        .on_press(Message::OpenEditModal),
+                    compact_button("✎ 编辑", ButtonKind::Ghost).on_press(Message::OpenEditModal),
                 ]
                 .spacing(12),
                 container(text(poem.title.clone()).size(36)).style(theme::title_text),
                 container(text(poem.metadata()).size(18)).style(theme::subdued_text),
                 container(text(poem.content.clone()).size(24)).style(theme::title_text),
-                row![
-                    action_button("AI 赏析", ButtonKind::Primary)
-                        .on_press(Message::RequestAppreciation),
-                ]
-                .spacing(12),
+                ai_button,
                 appreciation_card,
             ]
             .spacing(20),
@@ -596,4 +625,143 @@ fn dismiss_toast_later(revision: u64) -> Task<Message> {
         },
         Message::ToastExpired,
     )
+}
+
+const ICON_BRAND: &str = "assets/icons/brand-book.svg";
+const ICON_PLUS: &str = "assets/icons/plus.svg";
+const ICON_HOME: &str = "assets/icons/home.svg";
+const ICON_FAVORITE: &str = "assets/icons/favorite-outline.svg";
+const ICON_ABOUT: &str = "assets/icons/about.svg";
+const ICON_SETTINGS: &str = "assets/icons/settings.svg";
+const ICON_BRUSH: &str = "assets/icons/brush.svg";
+const ICON_SNOWFLAKE: &str = "assets/icons/snowflake.svg";
+
+#[derive(Debug, Clone, Copy)]
+enum SidebarIconTone {
+    Accent,
+    Default,
+    Muted,
+    Inverse,
+}
+
+fn sidebar_divider<'a, Message: 'a>() -> iced::widget::Container<'a, Message> {
+    container(Space::new().height(1))
+        .width(Length::Fill)
+        .height(1)
+        .style(theme::sidebar_divider)
+}
+
+fn sidebar_primary_button<'a>(
+    icon_path: &'static str,
+    label: &'a str,
+) -> button::Button<'a, Message> {
+    button(
+        container(
+            row![
+                sidebar_icon::<Message>(icon_path, 18.0, SidebarIconTone::Inverse),
+                text(label).size(16),
+            ]
+            .spacing(10)
+            .align_y(Alignment::Center),
+        )
+        .width(Length::Fill)
+        .center_x(Length::Fill),
+    )
+    .width(Length::Fill)
+    .padding([18, 22])
+    .style(theme::button_sidebar_primary)
+}
+
+fn sidebar_nav_button<'a>(
+    icon_path: &'static str,
+    label: &'a str,
+    active: bool,
+) -> button::Button<'a, Message> {
+    let icon_tone = if active {
+        SidebarIconTone::Accent
+    } else {
+        SidebarIconTone::Default
+    };
+
+    button(
+        container(
+            row![
+                sidebar_icon::<Message>(icon_path, 22.0, icon_tone),
+                text(label).size(17),
+            ]
+            .spacing(14)
+            .align_y(Alignment::Center),
+        )
+        .width(Length::Fill),
+    )
+    .width(Length::Fill)
+    .padding([14, 16])
+    .style(if active {
+        theme::button_sidebar_nav_active
+    } else {
+        theme::button_sidebar_nav
+    })
+}
+
+fn sidebar_theme_button<'a>(
+    icon_path: &'static str,
+    label: &'a str,
+    selected: bool,
+) -> button::Button<'a, Message> {
+    let icon_tone = if selected {
+        SidebarIconTone::Inverse
+    } else {
+        SidebarIconTone::Muted
+    };
+
+    button(
+        container(
+            row![
+                sidebar_icon::<Message>(icon_path, 18.0, icon_tone),
+                text(label).size(15),
+            ]
+            .spacing(10)
+            .align_y(Alignment::Center),
+        )
+        .width(Length::Fill)
+        .center_x(Length::Fill),
+    )
+    .width(Length::Fill)
+    .padding([14, 16])
+    .style(if selected {
+        theme::button_sidebar_theme_active
+    } else {
+        theme::button_sidebar_theme
+    })
+}
+
+fn sidebar_icon<'a, Message: 'a>(
+    icon_path: &'static str,
+    size: f32,
+    tone: SidebarIconTone,
+) -> Element<'a, Message> {
+    iced::widget::svg(icon_path)
+        .width(Length::Fixed(size))
+        .height(Length::Fixed(size))
+        .style(move |theme: &Theme, _status| iced::widget::svg::Style {
+            color: Some(sidebar_icon_color(theme, tone)),
+        })
+        .into()
+}
+
+fn sidebar_icon_color(theme: &Theme, tone: SidebarIconTone) -> Color {
+    let tokens = theme::tokens(theme);
+
+    match tone {
+        SidebarIconTone::Accent => tokens.primary,
+        SidebarIconTone::Default => {
+            if tokens.title.r > 0.7 {
+                tokens.text
+            } else {
+                tokens.title
+            }
+        }
+        SidebarIconTone::Muted => tokens.text_muted,
+        SidebarIconTone::Inverse => Color::from_rgb8(0xFF, 0xF8, 0xF2),
+    }
 }

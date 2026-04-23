@@ -35,7 +35,7 @@ pub fn nav_surface<'a, Message: 'a>(
 ) -> Container<'a, Message> {
     widget::container(content)
         .width(Length::Fill)
-        .padding(theme::SPACE_4)
+        .padding(theme::SPACE_5)
         .style(theme::sidebar_panel)
 }
 
