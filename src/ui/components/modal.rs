@@ -1,10 +1,11 @@
 use iced::{
-    Element, Length,
+    Element, Length, Theme,
     widget::{self, mouse_area, opaque},
 };
 
-use super::button::{ButtonKind, compact_button};
 use crate::ui::theme;
+
+const ICON_CLOSE: &str = "assets/icons/close.svg";
 
 pub fn modal_header<'a, Message: 'a>(
     title: impl Into<String>,
@@ -27,14 +28,26 @@ pub fn modal_header_with_close<'a, Message: Clone + 'a>(
     subtitle: Option<&'a str>,
     close_message: Message,
 ) -> Element<'a, Message> {
+    let close_icon = widget::svg(ICON_CLOSE)
+        .width(Length::Fixed(24.0))
+        .height(Length::Fixed(24.0))
+        .style(|active_theme: &Theme, _status| widget::svg::Style {
+            color: Some(theme::tokens(active_theme).title),
+        });
+
     widget::Row::new()
         .align_y(iced::Alignment::Start)
         .push(modal_header(title, subtitle))
         .push(widget::Space::new().width(Length::Fill))
         .push(
-            compact_button("关闭", ButtonKind::Secondary)
-                .width(112)
-                .on_press(close_message),
+            mouse_area(
+                widget::container(close_icon)
+                    .width(Length::Fixed(28.0))
+                    .height(Length::Fixed(28.0))
+                    .center_x(Length::Shrink)
+                    .center_y(Length::Shrink),
+            )
+            .on_press(close_message),
         )
         .into()
 }
