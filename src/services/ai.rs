@@ -1,5 +1,5 @@
 use anyhow::Result;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Duration;
@@ -45,13 +45,20 @@ pub enum AiTransportError {
     Parse(String),
 }
 
+#[allow(async_fn_in_trait)]
 pub trait AiTransport {
-    fn discover(&self, request: &DiscoveryPrompt) -> Result<DiscoveryPayload, AiTransportError>;
-    fn recommend(
+    async fn discover(
+        &self,
+        request: &DiscoveryPrompt,
+    ) -> Result<DiscoveryPayload, AiTransportError>;
+    async fn recommend(
         &self,
         request: &RecommendationPrompt,
     ) -> Result<RecommendationPayload, AiTransportError>;
-    fn appreciate(&self, request: &AppreciationPrompt) -> Result<AiAppreciation, AiTransportError>;
+    async fn appreciate(
+        &self,
+        request: &AppreciationPrompt,
+    ) -> Result<AiAppreciation, AiTransportError>;
 }
 
 #[derive(Clone, Debug)]
@@ -69,25 +76,25 @@ impl<T> OpenAiCompatibleClient<T>
 where
     T: AiTransport,
 {
-    pub fn discover(
+    pub async fn discover(
         &self,
         request: &DiscoveryPrompt,
     ) -> Result<DiscoveryPayload, AiTransportError> {
-        self.transport.discover(request)
+        self.transport.discover(request).await
     }
 
-    pub fn recommend(
+    pub async fn recommend(
         &self,
         request: &RecommendationPrompt,
     ) -> Result<RecommendationPayload, AiTransportError> {
-        self.transport.recommend(request)
+        self.transport.recommend(request).await
     }
 
-    pub fn appreciate(
+    pub async fn appreciate(
         &self,
         request: &AppreciationPrompt,
     ) -> Result<AiAppreciation, AiTransportError> {
-        self.transport.appreciate(request)
+        self.transport.appreciate(request).await
     }
 }
 
@@ -123,7 +130,7 @@ impl HttpAiTransport {
             .ok_or(AiTransportError::Unconfigured)
     }
 
-    fn post_chat(
+    async fn post_chat(
         &self,
         system_prompt: &str,
         user_prompt: &str,
@@ -150,11 +157,13 @@ impl HttpAiTransport {
             .bearer_auth(api_key)
             .json(&body)
             .send()
+            .await
             .map_err(map_reqwest_error)?;
 
         let response = response.error_for_status().map_err(map_reqwest_error)?;
         let payload: ChatResponse = response
             .json()
+            .await
             .map_err(|err| AiTransportError::Parse(err.to_string()))?;
 
         payload
@@ -167,7 +176,10 @@ impl HttpAiTransport {
 }
 
 impl AiTransport for HttpAiTransport {
-    fn discover(&self, request: &DiscoveryPrompt) -> Result<DiscoveryPayload, AiTransportError> {
+    async fn discover(
+        &self,
+        request: &DiscoveryPrompt,
+    ) -> Result<DiscoveryPayload, AiTransportError> {
         let system_prompt = r#"你是一个专业的古诗词检索助手。用户可能会提供诗词片段、关键词、主题意境描述或模糊记忆。你的任务是理解用户搜索意图，找到最匹配的完整古诗词，并只返回 JSON 数组。
 
 返回要求：
@@ -182,11 +194,11 @@ impl AiTransport for HttpAiTransport {
             "基于我的搜索意图“{}”，请返回最匹配的 3 首古诗词。\n要求：\n- 返回完整准确的标题、作者、朝代、全文\n- content 中的换行使用 \\n 表示，段落之间使用 \\n\\n 表示\n- 结果必须可以被程序直接解析为 JSON 数组\n- isRecommendation 统一返回 true",
             request.query
         );
-        let content = self.post_chat(system_prompt, &user_prompt)?;
+        let content = self.post_chat(system_prompt, &user_prompt).await?;
         parse_discovery_content(&content)
     }
 
-    fn recommend(
+    async fn recommend(
         &self,
         request: &RecommendationPrompt,
     ) -> Result<RecommendationPayload, AiTransportError> {
@@ -197,17 +209,20 @@ impl AiTransport for HttpAiTransport {
             "用户需求：{}\n候选诗词：{}\n请从候选诗词中挑选最合适的 3 首。",
             request.user_prompt, candidates_json
         );
-        let content = self.post_chat(system_prompt, &user_prompt)?;
+        let content = self.post_chat(system_prompt, &user_prompt).await?;
         parse_recommendation_content(&content)
     }
 
-    fn appreciate(&self, request: &AppreciationPrompt) -> Result<AiAppreciation, AiTransportError> {
+    async fn appreciate(
+        &self,
+        request: &AppreciationPrompt,
+    ) -> Result<AiAppreciation, AiTransportError> {
         let system_prompt = "你是一个古典诗词赏析助手。只返回 JSON，不要额外解释。JSON 结构必须为 {\"poem_id\":string,\"summary\":string,\"themes\":[string],\"imagery\":[string],\"notes_markdown\":string}。";
         let user_prompt = format!(
             "请为下面这首诗生成简洁中文赏析，并保持 poem_id 原样返回。\npoem_id: {}\n标题: {}\n作者: {}\n朝代: {}\n诗句:\n{}",
             request.poem_id, request.title, request.author, request.dynasty, request.excerpt
         );
-        let content = self.post_chat(system_prompt, &user_prompt)?;
+        let content = self.post_chat(system_prompt, &user_prompt).await?;
         parse_appreciation_content(&content)
     }
 }
@@ -399,6 +414,7 @@ pub fn build_appreciation_prompt(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::future::Future;
 
     #[derive(Clone)]
     struct StubTransport {
@@ -408,26 +424,30 @@ mod tests {
     }
 
     impl AiTransport for StubTransport {
-        fn discover(
+        async fn discover(
             &self,
             _request: &DiscoveryPrompt,
         ) -> Result<DiscoveryPayload, AiTransportError> {
             self.discovery.clone()
         }
 
-        fn recommend(
+        async fn recommend(
             &self,
             _request: &RecommendationPrompt,
         ) -> Result<RecommendationPayload, AiTransportError> {
             self.recommendation.clone()
         }
 
-        fn appreciate(
+        async fn appreciate(
             &self,
             _request: &AppreciationPrompt,
         ) -> Result<AiAppreciation, AiTransportError> {
             self.appreciation.clone()
         }
+    }
+
+    fn block_on<F: Future>(future: F) -> F::Output {
+        iced::futures::executor::block_on(future)
     }
 
     #[test]
@@ -462,36 +482,33 @@ mod tests {
             )),
         });
 
-        let discovered = client
-            .discover(&DiscoveryPrompt {
-                query: "登高".into(),
-            })
-            .expect("discover");
+        let discovered = block_on(client.discover(&DiscoveryPrompt {
+            query: "登高".into(),
+        }))
+        .expect("discover");
         assert_eq!(discovered.poems[0].title, "登高");
 
-        let recommendations = client
-            .recommend(&RecommendationPrompt {
-                user_prompt: "find spring poems".into(),
-                candidates: vec![PoemCandidate::new(
-                    "poem-1",
-                    "春晓",
-                    "孟浩然",
-                    "唐",
-                    "春眠不觉晓",
-                )],
-            })
-            .expect("recommendations");
+        let recommendations = block_on(client.recommend(&RecommendationPrompt {
+            user_prompt: "find spring poems".into(),
+            candidates: vec![PoemCandidate::new(
+                "poem-1",
+                "春晓",
+                "孟浩然",
+                "唐",
+                "春眠不觉晓",
+            )],
+        }))
+        .expect("recommendations");
         assert_eq!(recommendations.recommendations.len(), 1);
 
-        let appreciation = client
-            .appreciate(&AppreciationPrompt {
-                poem_id: "poem-1".into(),
-                title: "春晓".into(),
-                author: "孟浩然".into(),
-                dynasty: "唐".into(),
-                excerpt: "春眠不觉晓".into(),
-            })
-            .expect("appreciation");
+        let appreciation = block_on(client.appreciate(&AppreciationPrompt {
+            poem_id: "poem-1".into(),
+            title: "春晓".into(),
+            author: "孟浩然".into(),
+            dynasty: "唐".into(),
+            excerpt: "春眠不觉晓".into(),
+        }))
+        .expect("appreciation");
         assert_eq!(appreciation.poem_id, "poem-1");
     }
 
@@ -504,21 +521,19 @@ mod tests {
         });
 
         assert_eq!(
-            client
-                .discover(&DiscoveryPrompt {
-                    query: "request".into(),
-                })
-                .expect_err("timeout expected"),
+            block_on(client.discover(&DiscoveryPrompt {
+                query: "request".into(),
+            }))
+            .expect_err("timeout expected"),
             AiTransportError::Timeout
         );
 
         assert_eq!(
-            client
-                .recommend(&RecommendationPrompt {
-                    user_prompt: "request".into(),
-                    candidates: vec![],
-                })
-                .expect_err("timeout expected"),
+            block_on(client.recommend(&RecommendationPrompt {
+                user_prompt: "request".into(),
+                candidates: vec![],
+            }))
+            .expect_err("timeout expected"),
             AiTransportError::Timeout
         );
     }

@@ -24,6 +24,7 @@ pub async fn run_discovery_search(
 
     client
         .discover(&prompt)
+        .await
         .map(|payload| payload.poems)
         .map_err(|err| format!("AI 搜索失败: {err:?}"))
 }
@@ -59,6 +60,7 @@ pub async fn request_appreciation(
 
     client
         .appreciate(&prompt)
+        .await
         .map_err(|err| format!("AI 赏析失败: {err:?}"))
 }
 

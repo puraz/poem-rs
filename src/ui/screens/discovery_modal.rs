@@ -2,12 +2,14 @@ use iced::widget::{Space, column, container, row, scrollable, text};
 use iced::{Element, Length};
 
 use crate::ui::components::{
-    ButtonKind, action_button, modal_frame, modal_header_with_close, search_input_prominent,
+    ButtonKind, action_button, compact_button, field_input, modal_frame, modal_header_with_close,
     surface,
 };
 use crate::ui::message::Message;
 use crate::ui::state::DiscoveryListItem;
 use crate::ui::{components::SurfaceKind, theme};
+
+const DISCOVERY_BODY_HEIGHT: f32 = 420.0;
 
 pub fn view<'a>(
     query: &'a str,
@@ -18,30 +20,16 @@ pub fn view<'a>(
     let search_label = if loading { "搜索中..." } else { "搜索" };
     let result_count = items.len();
 
-    let search_panel = surface(
-        column![
-            row![
-                search_input_prominent("例如：春江花月夜 / 西窗烛 / 山雨欲来", query)
-                    .on_input(Message::DiscoveryQueryChanged)
-                    .width(Length::Fill),
-                action_button(search_label, ButtonKind::Primary)
-                    .width(140)
-                    .on_press(Message::SubmitDiscovery),
-            ]
-            .spacing(14)
-            .align_y(iced::Alignment::Center),
-            if !loading && !status.trim().is_empty() {
-                container(text(status).size(14)).style(theme::subdued_text)
-            } else if result_count > 0 {
-                container(text(format!("已生成 {result_count} 条候选。")).size(14))
-                    .style(theme::subdued_text)
-            } else {
-                container(Space::new())
-            },
-        ]
-        .spacing(16),
-        SurfaceKind::Raised,
-    );
+    let search_row = row![
+        field_input("例如：春江花月夜 / 西窗烛 / 山雨欲来", query)
+            .on_input(Message::DiscoveryQueryChanged)
+            .width(Length::Fill),
+        compact_button(search_label, ButtonKind::Primary)
+            .width(112)
+            .on_press(Message::SubmitDiscovery),
+    ]
+    .spacing(12)
+    .align_y(iced::Alignment::Center);
 
     let results: Option<Element<'a, Message>> = if result_count > 0 {
         let cards = items
@@ -53,26 +41,32 @@ pub fn view<'a>(
 
         Some(
             column![
-                text("候选结果").size(20),
+                if !status.trim().is_empty() {
+                    container(text(status).size(14)).style(theme::subdued_text)
+                } else {
+                    container(text(format!("已生成 {result_count} 条候选。")).size(14))
+                        .style(theme::subdued_text)
+                },
                 scrollable(cards).height(Length::Fill),
             ]
+            .height(Length::Fill)
             .spacing(14)
             .into(),
         )
-    } else if loading || !status.trim().is_empty() {
-        Some(empty_state(loading, status))
     } else {
-        None
+        Some(empty_state(query, loading, status))
     };
 
-    let mut body = column![search_panel].spacing(18);
+    let mut body = column![search_row].spacing(14).height(Length::Fill);
     if let Some(results) = results {
         body = body.push(results);
     }
 
     modal_frame(
         modal_header_with_close("发现新诗词", None, Message::CloseModal),
-        scrollable(body).height(Length::Shrink),
+        container(body)
+            .width(Length::Fill)
+            .height(Length::Fixed(DISCOVERY_BODY_HEIGHT)),
         None,
     )
 }
@@ -111,26 +105,26 @@ fn result_card(index: usize, item: DiscoveryListItem) -> Element<'static, Messag
     surface(body, SurfaceKind::Raised).into()
 }
 
-fn empty_state<'a>(loading: bool, status: &'a str) -> Element<'a, Message> {
-    let (title, detail) = empty_state_copy(loading, status);
+fn empty_state<'a>(query: &'a str, loading: bool, status: &'a str) -> Element<'a, Message> {
+    let title = empty_state_copy(query, loading, status);
 
-    let content = if let Some(detail) = detail {
-        column![
-            text(title).size(22),
-            container(text(detail).size(16)).style(theme::subdued_text),
-        ]
-        .spacing(14)
-    } else {
-        column![text(title).size(22)].spacing(0)
-    };
-
-    surface(content, SurfaceKind::Raised).into()
+    container(text(title).size(22))
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .center_x(Length::Fill)
+        .center_y(Length::Fill)
+        .style(theme::subdued_text)
+        .into()
 }
 
-fn empty_state_copy<'a>(loading: bool, status: &'a str) -> (&'a str, Option<&'a str>) {
+fn empty_state_copy<'a>(query: &'a str, loading: bool, status: &'a str) -> &'a str {
     if loading {
-        ("正在整理结果...", None)
+        "正在搜索中..."
+    } else if query.trim().is_empty() {
+        "输入关键词开始搜索"
+    } else if !status.trim().is_empty() {
+        status
     } else {
-        ("当前没有可展示结果", Some(status))
+        "当前没有可展示结果"
     }
 }
