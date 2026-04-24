@@ -565,14 +565,11 @@ impl PoemApp {
     }
 
     fn detail_pane(&self) -> Element<'_, Message> {
-        let pane_title = container(text("阅读").size(14)).style(theme::title_text);
-
         let Some(poem) = self.state.selected_poem() else {
             return row![
                 content_vertical_divider::<Message>(),
                 container(
                     column![
-                        pane_title,
                         Space::new().height(Length::FillPortion(1)),
                         column![
                             text("暂无诗词").size(28),
@@ -609,7 +606,6 @@ impl PoemApp {
         };
 
         let action_row = row![
-            pane_title,
             Space::new().width(Length::Fill),
             detail_icon_action(
                 favorite_icon,
@@ -639,7 +635,7 @@ impl PoemApp {
         let mut reading_column = column![
             container(
                 text(poem.title.clone())
-                    .size(38)
+                    .size(28)
                     .width(Length::Fill)
                     .align_x(alignment::Horizontal::Center),
             )
@@ -653,7 +649,7 @@ impl PoemApp {
             .style(theme::subdued_text),
             container(
                 text(poem.content.clone())
-                    .size(24)
+                    .size(19)
                     .width(Length::Fill)
                     .align_x(alignment::Horizontal::Center),
             )

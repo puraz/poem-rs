@@ -49,7 +49,7 @@ pub fn view<'a>(
             let card = container(
                 column![
                     row![
-                        text(title).size(if selected { 24 } else { 22 }),
+                        text(title).size(22),
                         iced::widget::Space::new().width(Length::Fill),
                         favorite_icon(is_favorite),
                     ]
