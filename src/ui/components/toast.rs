@@ -59,7 +59,9 @@ pub fn toast_host<'a, Message: 'a>(
     let overlay = widget::container(
         widget::Column::new()
             .width(Length::Fill)
+            .height(Length::Fill)
             .align_x(iced::Alignment::End)
+            .push(widget::Space::new().height(Length::Fill))
             .push(toast),
     )
     .width(Length::Fill)
