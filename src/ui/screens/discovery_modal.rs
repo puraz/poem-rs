@@ -47,7 +47,10 @@ pub fn view<'a>(
                     container(text(format!("已生成 {result_count} 条候选。")).size(14))
                         .style(theme::subdued_text)
                 },
-                scrollable(cards).height(Length::Fill),
+                scrollable(cards)
+                    .direction(theme::scrollable_direction())
+                    .style(theme::scrollable_style)
+                    .height(Length::Fill),
             ]
             .height(Length::Fill)
             .spacing(14)

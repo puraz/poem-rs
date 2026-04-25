@@ -97,7 +97,10 @@ pub fn view<'a>(
         column![
             container(text(title).size(14)).style(theme::title_text),
             search,
-            scrollable(list).height(Length::Fill),
+            scrollable(list)
+                .direction(theme::scrollable_direction())
+                .style(theme::scrollable_style)
+                .height(Length::Fill),
         ]
         .spacing(22),
     )

@@ -34,7 +34,10 @@ pub fn view<'a>(form: &'a SettingsForm) -> Element<'a, Message> {
 
     modal_frame(
         modal_header_with_close("AI 设置", Some(""), Message::CloseModal),
-        scrollable(content).height(Length::Shrink),
+        scrollable(content)
+            .direction(theme::scrollable_direction())
+            .style(theme::scrollable_style)
+            .height(Length::Shrink),
         Some(
             row![
                 Space::new().width(Length::Fill),

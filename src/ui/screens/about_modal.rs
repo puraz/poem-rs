@@ -3,6 +3,7 @@ use iced::{Element, Length};
 
 use crate::ui::components::{modal_frame, modal_header_with_close};
 use crate::ui::message::Message;
+use crate::ui::theme;
 
 pub fn view<'a>() -> Element<'a, Message> {
     let hero = container(
@@ -32,6 +33,8 @@ pub fn view<'a>() -> Element<'a, Message> {
         ]
         .spacing(16),
     )
+    .direction(theme::scrollable_direction())
+    .style(theme::scrollable_style)
     .height(Length::Fill);
 
     modal_frame(
@@ -39,18 +42,4 @@ pub fn view<'a>() -> Element<'a, Message> {
         body,
         None,
     )
-}
-
-fn section<'a>(title: &'a str, items: &'a [&'a str]) -> Element<'a, Message> {
-    let list = items
-        .iter()
-        .fold(column![text(title).size(18)].spacing(10), |column, item| {
-            column.push(text(format!("- {item}")).size(15))
-        });
-
-    container(list)
-        .padding(20)
-        .width(Length::Fill)
-        .style(container::rounded_box)
-        .into()
 }

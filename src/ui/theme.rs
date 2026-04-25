@@ -2,7 +2,7 @@ use iced::{
     Background, Border, Color, Shadow, Theme, Vector,
     border::Radius,
     theme::Palette,
-    widget::{button, container, text_editor, text_input},
+    widget::{button, container, scrollable, text_editor, text_input},
 };
 
 use super::message::ThemeChoice;
@@ -752,6 +752,130 @@ pub fn text_editor_default(theme: &Theme, status: text_editor::Status) -> text_e
         value: t.text,
         selection: tint(t.primary, if is_light(theme) { 0.22 } else { 0.34 }),
     }
+}
+
+pub fn scrollable_direction() -> scrollable::Direction {
+    scrollable::Direction::Vertical(
+        scrollable::Scrollbar::new()
+            .width(6.0)
+            .scroller_width(4.0)
+            .margin(1.0),
+    )
+}
+
+pub fn scrollable_style(theme: &Theme, status: scrollable::Status) -> scrollable::Style {
+    let t = tokens(theme);
+    let mut style = scrollable::default(theme, status);
+
+    let is_emphasized = match status {
+        scrollable::Status::Active { .. } => false,
+        scrollable::Status::Hovered {
+            is_horizontal_scrollbar_hovered,
+            is_vertical_scrollbar_hovered,
+            ..
+        } => is_horizontal_scrollbar_hovered || is_vertical_scrollbar_hovered,
+        scrollable::Status::Dragged {
+            is_horizontal_scrollbar_dragged,
+            is_vertical_scrollbar_dragged,
+            ..
+        } => is_horizontal_scrollbar_dragged || is_vertical_scrollbar_dragged,
+    };
+
+    let is_dragged = matches!(status, scrollable::Status::Dragged { .. });
+
+    let rail_background = if is_dragged {
+        Some(Background::Color(if is_light(theme) {
+            tint(t.primary, 0.86)
+        } else {
+            Color::from_rgba8(229, 211, 176, 0.08)
+        }))
+    } else if is_emphasized {
+        Some(Background::Color(if is_light(theme) {
+            color(0xF3ECE4)
+        } else {
+            Color::from_rgba8(229, 211, 176, 0.05)
+        }))
+    } else {
+        Some(Background::Color(Color::from_rgba8(255, 255, 255, 0.0)))
+    };
+
+    let rail_border = if is_dragged {
+        border(
+            if is_light(theme) {
+                tint(t.primary, 0.62)
+            } else {
+                Color::from_rgba8(229, 211, 176, 0.18)
+            },
+            1.0,
+            RADIUS_SMALL,
+        )
+    } else if is_emphasized {
+        border(
+            if is_light(theme) {
+                color(0xE2D7CA)
+            } else {
+                Color::from_rgba8(229, 211, 176, 0.10)
+            },
+            1.0,
+            RADIUS_SMALL,
+        )
+    } else {
+        border(Color::TRANSPARENT, 0.0, RADIUS_SMALL)
+    };
+
+    let scroller_background = if is_dragged {
+        if is_light(theme) {
+            t.primary
+        } else {
+            tint(t.primary_hover, 0.08)
+        }
+    } else if is_emphasized {
+        if is_light(theme) {
+            color(0xB8A898)
+        } else {
+            Color::from_rgba8(229, 211, 176, 0.42)
+        }
+    } else if is_light(theme) {
+        Color::from_rgba8(184, 168, 152, 0.14)
+    } else {
+        Color::from_rgba8(229, 211, 176, 0.04)
+    };
+
+    let scroller_border = if is_dragged {
+        border(
+            if is_light(theme) {
+                deepen(t.primary, 0.12)
+            } else {
+                Color::from_rgba8(212, 107, 92, 0.85)
+            },
+            1.0,
+            RADIUS_SMALL,
+        )
+    } else if is_emphasized {
+        border(
+            if is_light(theme) {
+                color(0xAF9B89)
+            } else {
+                Color::from_rgba8(229, 211, 176, 0.22)
+            },
+            1.0,
+            RADIUS_SMALL,
+        )
+    } else {
+        border(Color::TRANSPARENT, 0.0, RADIUS_SMALL)
+    };
+
+    style.vertical_rail.background = rail_background;
+    style.vertical_rail.border = rail_border;
+    style.vertical_rail.scroller.background = Background::Color(scroller_background);
+    style.vertical_rail.scroller.border = scroller_border;
+
+    style.horizontal_rail.background = rail_background;
+    style.horizontal_rail.border = rail_border;
+    style.horizontal_rail.scroller.background = Background::Color(scroller_background);
+    style.horizontal_rail.scroller.border = scroller_border;
+
+    style
 }
 
 pub fn chip_style(theme: &Theme, tone: Tone) -> container::Style {

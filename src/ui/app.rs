@@ -689,11 +689,16 @@ impl PoemApp {
 
         row![
             content_vertical_divider::<Message>(),
-            container(scrollable(content).height(Length::Fill))
-                .width(Length::Fill)
-                .height(Length::Fill)
-                .padding([28, 34])
-                .style(theme::detail_stage),
+            container(
+                scrollable(content)
+                    .direction(theme::scrollable_direction())
+                    .style(theme::scrollable_style)
+                    .height(Length::Fill),
+            )
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding([28, 34])
+            .style(theme::detail_stage),
         ]
         .width(Length::Fill)
         .height(Length::Fill)

@@ -42,7 +42,10 @@ pub fn view(form: &'_ EditForm) -> Element<'_, Message> {
 
     modal_frame(
         modal_header_with_close("编辑诗词", None, Message::CloseModal),
-        scrollable(content).height(Length::Shrink),
+        scrollable(content)
+            .direction(theme::scrollable_direction())
+            .style(theme::scrollable_style)
+            .height(Length::Shrink),
         Some(
             row![
                 Space::new().width(Length::Fill),
