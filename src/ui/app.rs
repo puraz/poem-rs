@@ -4,7 +4,7 @@ use anyhow::Result;
 use iced::widget::{Space, button, column, container, mouse_area, row, scrollable, text};
 use iced::{
     Alignment, Color, Element, Length, Size, Subscription, Task, Theme, alignment, mouse, system,
-    window,
+    time, window,
 };
 use tracing_subscriber::EnvFilter;
 
@@ -12,7 +12,8 @@ use crate::config::app::AppPaths;
 use crate::storage::{AppDatabase, StoredAiConfig};
 
 use super::components::{
-    SurfaceKind, ToastTone, modal_overlay, nav_surface, page_shell, surface, toast, toast_host,
+    SurfaceKind, ToastTone, loading_indicator, modal_overlay, nav_surface, page_shell, surface,
+    toast, toast_host,
 };
 use super::message::{ContentMode, DetailTool, Message, Modal, ThemeChoice};
 use super::screens::{about_modal, discovery_modal, edit_modal, library, settings_modal};
@@ -75,7 +76,16 @@ impl PoemApp {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        system::theme_changes().map(Message::SystemThemeChanged)
+        let theme_changes = system::theme_changes().map(Message::SystemThemeChanged);
+
+        if self.state.is_loading_animation_active() {
+            Subscription::batch(vec![
+                theme_changes,
+                time::every(Duration::from_millis(320)).map(|_| Message::LoadingTick),
+            ])
+        } else {
+            theme_changes
+        }
     }
 
     fn theme(&self) -> Theme {
@@ -156,13 +166,18 @@ impl PoemApp {
                 Task::none()
             }
             Message::SubmitDiscovery => {
+                if self.state.discovery_loading {
+                    return Task::none();
+                }
                 if self.state.discovery_query.trim().is_empty() {
                     self.state.discovery_loading = false;
                     self.state.discovery_status = "请输入关键词".to_string();
                     return Task::none();
                 }
                 self.state.discovery_loading = true;
+                self.state.loading_frame = 0;
                 self.state.discovery_status.clear();
+                self.state.discovery_results.clear();
                 self.state.active_modal = Modal::Discovery;
                 let paths = self.paths.clone();
                 let config = self.ai_config.clone();
@@ -336,12 +351,14 @@ impl PoemApp {
                 }
             },
             Message::RequestAppreciation => {
+                if self.state.appreciation.loading {
+                    return Task::none();
+                }
                 let Some(poem) = self.state.selected_poem() else {
                     return Task::none();
                 };
-                self.state.appreciation.poem_id = Some(poem.id.clone());
-                self.state.appreciation.loading = true;
-                self.state.appreciation.error.clear();
+                self.state.loading_frame = 0;
+                self.state.appreciation.begin_loading(poem.id.clone());
                 let paths = self.paths.clone();
                 let db = self.db.clone();
                 let config = self.ai_config.clone();
@@ -351,18 +368,28 @@ impl PoemApp {
                 )
             }
             Message::AppreciationLoaded(result) => {
-                self.state.appreciation.loading = false;
                 match result {
                     Ok(payload) => {
-                        self.state.appreciation.poem_id = Some(payload.poem_id);
-                        self.state.appreciation.content = payload.content;
-                        self.state.appreciation.error.clear();
+                        let poem_id = payload.poem_id;
+                        self.state.appreciation.finish_loading(&poem_id);
+                        if self.state.selected_poem_id.as_deref() == Some(poem_id.as_str()) {
+                            self.state
+                                .appreciation
+                                .set_content(poem_id, payload.content);
+                        }
                     }
-                    Err(message) => {
-                        self.state.appreciation.error = message;
-                        self.state.appreciation.content.clear();
+                    Err(failure) => {
+                        let poem_id = failure.poem_id;
+                        self.state.appreciation.finish_loading(&poem_id);
+                        if self.state.selected_poem_id.as_deref() == Some(poem_id.as_str()) {
+                            self.state.appreciation.set_error(poem_id, failure.message);
+                        }
                     }
                 }
+                Task::none()
+            }
+            Message::LoadingTick => {
+                self.state.advance_loading_frame();
                 Task::none()
             }
             Message::ToggleThemePanel => {
@@ -421,6 +448,7 @@ impl PoemApp {
                 discovery_modal::view(
                     &self.state.discovery_query,
                     self.state.discovery_loading,
+                    self.state.loading_frame,
                     &self.state.discovery_status,
                     self.state.discovery_items(),
                 ),
@@ -612,21 +640,21 @@ impl PoemApp {
                 favorite_tone,
                 poem.is_favorite,
                 DetailTool::Favorite,
-                Message::ToggleFavorite
+                Some(Message::ToggleFavorite)
             ),
             detail_icon_action(
                 ICON_EDIT,
                 SidebarIconTone::Default,
                 false,
                 DetailTool::Edit,
-                Message::OpenEditModal,
+                Some(Message::OpenEditModal),
             ),
             detail_icon_action(
                 ICON_APPRECIATION,
                 SidebarIconTone::Default,
                 false,
                 DetailTool::Appreciation,
-                Message::RequestAppreciation,
+                (!self.state.appreciation.loading).then_some(Message::RequestAppreciation),
             ),
         ]
         .spacing(12)
@@ -658,19 +686,17 @@ impl PoemApp {
         .align_x(Alignment::Center)
         .spacing(22);
 
-        if self.state.appreciation.loading {
+        if self.state.appreciation.is_loading_for(&poem.id) {
             reading_column = reading_column.push(surface(
-                text("正在生成赏析…").size(15),
+                loading_indicator("正在获取赏析…", self.state.loading_frame),
                 SurfaceKind::Appreciation,
             ));
-        } else if !self.state.appreciation.error.is_empty() {
+        } else if self.state.appreciation.has_error_for(&poem.id) {
             reading_column = reading_column.push(surface(
                 text(self.state.appreciation.error.clone()).size(15),
                 SurfaceKind::Appreciation,
             ));
-        } else if !self.state.appreciation.content.is_empty()
-            && self.state.appreciation.poem_id.as_deref() == Some(poem.id.as_str())
-        {
+        } else if self.state.appreciation.has_content_for(&poem.id) {
             reading_column = reading_column.push(surface(
                 text(self.state.appreciation.content.clone()).size(16),
                 SurfaceKind::Appreciation,
@@ -718,17 +744,15 @@ impl PoemApp {
 
         match self.db.load_cached_analysis(&poem.id) {
             Ok(Some(appreciation)) => {
-                self.state.appreciation.poem_id = Some(poem.id);
-                self.state.appreciation.content = appreciation.display_text();
-                self.state.appreciation.loading = false;
-                self.state.appreciation.error.clear();
+                self.state
+                    .appreciation
+                    .set_content(poem.id, appreciation.display_text());
             }
-            Ok(None) => self.state.appreciation.clear(),
+            Ok(None) => self.state.appreciation.clear_visible_feedback(),
             Err(err) => {
-                self.state.appreciation.poem_id = Some(poem.id);
-                self.state.appreciation.content.clear();
-                self.state.appreciation.loading = false;
-                self.state.appreciation.error = format!("读取赏析缓存失败: {err}");
+                self.state
+                    .appreciation
+                    .set_error(poem.id, format!("读取赏析缓存失败: {err}"));
             }
         }
     }
@@ -899,30 +923,37 @@ fn detail_icon_action<'a>(
     icon_tone: SidebarIconTone,
     active: bool,
     tool: DetailTool,
-    on_press: Message,
+    on_press: Option<Message>,
 ) -> Element<'a, Message> {
-    mouse_area(
-        button(
-            container(sidebar_icon::<Message>(icon_path, 28.0, icon_tone))
-                .width(Length::Fixed(40.0))
-                .height(Length::Fixed(40.0))
-                .center_x(Length::Shrink)
-                .center_y(Length::Shrink),
-        )
-        .width(Length::Fixed(44.0))
-        .height(Length::Fixed(44.0))
-        .padding(0)
-        .style(if active {
-            theme::button_detail_icon_active
-        } else {
-            theme::button_detail_icon
-        })
-        .on_press(on_press),
+    let mut action = button(
+        container(sidebar_icon::<Message>(icon_path, 28.0, icon_tone))
+            .width(Length::Fixed(40.0))
+            .height(Length::Fixed(40.0))
+            .center_x(Length::Shrink)
+            .center_y(Length::Shrink),
     )
-    .on_enter(Message::HoverDetailTool(Some(tool)))
-    .on_exit(Message::HoverDetailTool(None))
-    .interaction(mouse::Interaction::Pointer)
-    .into()
+    .width(Length::Fixed(44.0))
+    .height(Length::Fixed(44.0))
+    .padding(0)
+    .style(if active {
+        theme::button_detail_icon_active
+    } else {
+        theme::button_detail_icon
+    });
+
+    if let Some(message) = on_press.clone() {
+        action = action.on_press(message);
+    }
+
+    let mut area = mouse_area(action)
+        .on_enter(Message::HoverDetailTool(Some(tool)))
+        .on_exit(Message::HoverDetailTool(None));
+
+    if on_press.is_some() {
+        area = area.interaction(mouse::Interaction::Pointer);
+    }
+
+    area.into()
 }
 
 fn sidebar_icon<'a, Message: 'a>(

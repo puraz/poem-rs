@@ -94,7 +94,8 @@ pub enum Message {
     SaveEdit,
     EditSaved(Result<EditedPoem, String>),
     RequestAppreciation,
-    AppreciationLoaded(Result<AppreciationResult, String>),
+    AppreciationLoaded(Result<AppreciationResult, AppreciationFailure>),
+    LoadingTick,
     ToggleThemePanel,
     CloseThemePanel,
     SwitchTheme(ThemeChoice),
@@ -125,6 +126,12 @@ pub struct EditedPoem {
 pub struct AppreciationResult {
     pub poem_id: String,
     pub content: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AppreciationFailure {
+    pub poem_id: String,
+    pub message: String,
 }
 
 #[cfg(test)]

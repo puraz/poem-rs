@@ -149,6 +149,8 @@ pub struct AppreciationState {
     pub poem_id: Option<String>,
     pub content: String,
     pub loading: bool,
+    pub loading_poem_id: Option<String>,
+    pub error_poem_id: Option<String>,
     pub error: String,
 }
 
@@ -157,7 +159,58 @@ impl AppreciationState {
         self.poem_id = None;
         self.content.clear();
         self.loading = false;
+        self.loading_poem_id = None;
+        self.error_poem_id = None;
         self.error.clear();
+    }
+
+    pub fn begin_loading(&mut self, poem_id: impl Into<String>) {
+        self.loading = true;
+        self.loading_poem_id = Some(poem_id.into());
+        self.poem_id = None;
+        self.content.clear();
+        self.error_poem_id = None;
+        self.error.clear();
+    }
+
+    pub fn finish_loading(&mut self, poem_id: &str) {
+        if self.loading_poem_id.as_deref() == Some(poem_id) {
+            self.loading = false;
+            self.loading_poem_id = None;
+        }
+    }
+
+    pub fn clear_visible_feedback(&mut self) {
+        self.poem_id = None;
+        self.content.clear();
+        self.error_poem_id = None;
+        self.error.clear();
+    }
+
+    pub fn set_content(&mut self, poem_id: impl Into<String>, content: impl Into<String>) {
+        self.poem_id = Some(poem_id.into());
+        self.content = content.into();
+        self.error_poem_id = None;
+        self.error.clear();
+    }
+
+    pub fn set_error(&mut self, poem_id: impl Into<String>, error: impl Into<String>) {
+        self.poem_id = None;
+        self.content.clear();
+        self.error_poem_id = Some(poem_id.into());
+        self.error = error.into();
+    }
+
+    pub fn is_loading_for(&self, poem_id: &str) -> bool {
+        self.loading && self.loading_poem_id.as_deref() == Some(poem_id)
+    }
+
+    pub fn has_content_for(&self, poem_id: &str) -> bool {
+        !self.content.is_empty() && self.poem_id.as_deref() == Some(poem_id)
+    }
+
+    pub fn has_error_for(&self, poem_id: &str) -> bool {
+        !self.error.is_empty() && self.error_poem_id.as_deref() == Some(poem_id)
     }
 }
 
@@ -196,6 +249,7 @@ pub struct AppState {
     pub appreciation: AppreciationState,
     pub edit_form: Option<EditForm>,
     pub hovered_detail_tool: Option<DetailTool>,
+    pub loading_frame: usize,
 }
 
 impl AppState {
@@ -223,7 +277,16 @@ impl AppState {
             appreciation: AppreciationState::default(),
             edit_form: None,
             hovered_detail_tool: None,
+            loading_frame: 0,
         }
+    }
+
+    pub fn is_loading_animation_active(&self) -> bool {
+        self.discovery_loading || self.appreciation.loading
+    }
+
+    pub fn advance_loading_frame(&mut self) {
+        self.loading_frame = (self.loading_frame + 1) % 4;
     }
 
     pub fn visible_poems(&self) -> Vec<Poem> {
@@ -448,7 +511,7 @@ mod tests {
     use iced::theme::Mode;
 
     use super::{
-        AppState, ContentMode, Modal, SettingsForm, ThemeChoice, ToastState,
+        AppState, AppreciationState, ContentMode, Modal, SettingsForm, ThemeChoice, ToastState,
         discovery_poem_excerpt, filter_poems, soft_wrap,
     };
 
@@ -689,5 +752,56 @@ mod tests {
         assert!(toast.visible);
         assert!(!toast.dismiss_if_current(first));
         assert!(toast.dismiss_if_current(second));
+    }
+
+    #[test]
+    fn loading_frame_wraps_after_four_steps() {
+        let mut state = AppState::new(
+            vec![poem("1", "静夜思", "李白", "床前明月光")],
+            Some("1".into()),
+            SettingsForm::default(),
+            ThemeChoice::Songyanjian,
+        );
+
+        for _ in 0..5 {
+            state.advance_loading_frame();
+        }
+
+        assert_eq!(state.loading_frame, 1);
+    }
+
+    #[test]
+    fn appreciation_loading_belongs_to_original_poem() {
+        let mut state = AppState::new(
+            vec![
+                poem("1", "静夜思", "李白", "床前明月光"),
+                poem("2", "春晓", "孟浩然", "春眠不觉晓"),
+            ],
+            Some("1".into()),
+            SettingsForm::default(),
+            ThemeChoice::Songyanjian,
+        );
+
+        state.appreciation.begin_loading("1");
+        state.selected_poem_id = Some("2".into());
+        state.appreciation.clear_visible_feedback();
+
+        assert!(state.appreciation.loading);
+        assert!(state.appreciation.is_loading_for("1"));
+        assert!(!state.appreciation.is_loading_for("2"));
+        assert!(!state.appreciation.has_content_for("2"));
+    }
+
+    #[test]
+    fn appreciation_finish_loading_only_clears_matching_request() {
+        let mut state = AppreciationState::default();
+
+        state.begin_loading("poem-1");
+        state.finish_loading("poem-2");
+        assert!(state.loading);
+
+        state.finish_loading("poem-1");
+        assert!(!state.loading);
+        assert_eq!(state.loading_poem_id, None);
     }
 }

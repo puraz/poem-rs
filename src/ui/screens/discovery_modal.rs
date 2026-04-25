@@ -2,8 +2,8 @@ use iced::widget::{Space, column, container, row, scrollable, text};
 use iced::{Element, Length};
 
 use crate::ui::components::{
-    ButtonKind, action_button, compact_button, field_input, modal_frame, modal_header_with_close,
-    surface,
+    ButtonKind, action_button, compact_button, field_input, loading_indicator, modal_frame,
+    modal_header_with_close, surface,
 };
 use crate::ui::message::Message;
 use crate::ui::state::DiscoveryListItem;
@@ -14,24 +14,36 @@ const DISCOVERY_BODY_HEIGHT: f32 = 420.0;
 pub fn view<'a>(
     query: &'a str,
     loading: bool,
+    loading_frame: usize,
     status: &'a str,
     items: Vec<DiscoveryListItem>,
 ) -> Element<'a, Message> {
     let search_label = if loading { "搜索中..." } else { "搜索" };
     let result_count = items.len();
+    let mut search_button = compact_button(search_label, ButtonKind::Primary).width(112);
+    if !loading {
+        search_button = search_button.on_press(Message::SubmitDiscovery);
+    }
 
     let search_row = row![
         field_input("例如：春江花月夜 / 西窗烛 / 山雨欲来", query)
             .on_input(Message::DiscoveryQueryChanged)
             .width(Length::Fill),
-        compact_button(search_label, ButtonKind::Primary)
-            .width(112)
-            .on_press(Message::SubmitDiscovery),
+        search_button,
     ]
     .spacing(12)
     .align_y(iced::Alignment::Center);
 
-    let results: Option<Element<'a, Message>> = if result_count > 0 {
+    let results: Option<Element<'a, Message>> = if loading {
+        Some(
+            container(loading_indicator("推荐诗词中", loading_frame))
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .center_x(Length::Fill)
+                .center_y(Length::Fill)
+                .into(),
+        )
+    } else if result_count > 0 {
         let cards = items
             .into_iter()
             .enumerate()

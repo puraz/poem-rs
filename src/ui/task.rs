@@ -8,7 +8,9 @@ use crate::services::ai::{
 };
 use crate::storage::{AppDatabase, StoredAiConfig};
 
-use super::message::{AppreciationResult, EditedPoem, ImportedPoem, SettingsSaveResult};
+use super::message::{
+    AppreciationFailure, AppreciationResult, EditedPoem, ImportedPoem, SettingsSaveResult,
+};
 use super::state::{EditForm, current_secret};
 
 pub async fn run_discovery_search(
@@ -69,13 +71,21 @@ pub async fn generate_and_persist_appreciation(
     db: AppDatabase,
     config: StoredAiConfig,
     poem: Poem,
-) -> Result<AppreciationResult, String> {
+) -> Result<AppreciationResult, AppreciationFailure> {
     let poem_id = poem.id.clone();
     let model = config.settings.model.clone();
-    let appreciation = request_appreciation(paths, config, poem).await?;
+    let appreciation = request_appreciation(paths, config, poem)
+        .await
+        .map_err(|message| AppreciationFailure {
+            poem_id: poem_id.clone(),
+            message,
+        })?;
 
     db.save_cached_analysis(&poem_id, &appreciation, &model)
-        .map_err(|err| format!("保存赏析缓存失败: {err}"))?;
+        .map_err(|err| AppreciationFailure {
+            poem_id: poem_id.clone(),
+            message: format!("保存赏析缓存失败: {err}"),
+        })?;
 
     Ok(AppreciationResult {
         poem_id,
