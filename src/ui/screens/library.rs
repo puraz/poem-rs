@@ -39,7 +39,7 @@ pub fn view<'a>(
 
     let list = poems
         .into_iter()
-        .fold(column![].spacing(22), |column, poem| {
+        .fold(column![].spacing(13), |column, poem| {
             let selected = selected_poem_id == Some(poem.id.as_str());
             let title = poem.title.clone();
             let meta = poem.metadata();
