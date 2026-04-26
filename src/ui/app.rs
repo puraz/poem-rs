@@ -20,6 +20,7 @@ use super::screens::{about_modal, discovery_modal, edit_modal, library, settings
 use super::state::{AppState, SettingsForm};
 use super::task;
 use super::theme;
+const DETAIL_PANE_PADDING: [u16; 2] = [24, 28];
 
 pub fn run() -> Result<()> {
     let env_filter = EnvFilter::try_from_default_env()
@@ -34,8 +35,8 @@ pub fn run() -> Result<()> {
         .subscription(PoemApp::subscription)
         .theme(PoemApp::theme)
         .window(window::Settings {
-            size: Size::new(1460.0, 920.0),
-            min_size: Some(Size::new(1240.0, 780.0)),
+            size: Size::new(1260.0, 800.0),
+            min_size: Some(Size::new(1260.0, 800.0)),
             position: window::Position::Centered,
             ..Default::default()
         })
@@ -610,7 +611,7 @@ impl PoemApp {
                 )
                 .width(Length::Fill)
                 .height(Length::Fill)
-                .padding([28, 34])
+                .padding(DETAIL_PANE_PADDING)
                 .style(theme::detail_stage),
             ]
             .width(Length::Fill)
@@ -663,21 +664,21 @@ impl PoemApp {
         let mut reading_column = column![
             container(
                 text(poem.title.clone())
-                    .size(28)
+                    .size(22)
                     .width(Length::Fill)
                     .align_x(alignment::Horizontal::Center),
             )
             .style(theme::title_text),
             container(
                 text(poem.metadata())
-                    .size(17)
+                    .size(14)
                     .width(Length::Fill)
                     .align_x(alignment::Horizontal::Center),
             )
             .style(theme::subdued_text),
             container(
                 text(poem.content.clone())
-                    .size(19)
+                    .size(17)
                     .width(Length::Fill)
                     .align_x(alignment::Horizontal::Center),
             )
@@ -723,7 +724,7 @@ impl PoemApp {
             )
             .width(Length::Fill)
             .height(Length::Fill)
-            .padding([28, 34])
+            .padding(DETAIL_PANE_PADDING)
             .style(theme::detail_stage),
         ]
         .width(Length::Fill)

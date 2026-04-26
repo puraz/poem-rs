@@ -10,8 +10,8 @@ pub fn view<'a>() -> Element<'a, Message> {
         column![
             text("poem-rs").size(28),
             text(format!("v{}", env!("CARGO_PKG_VERSION"))).size(14),
-            text("本地诗库与 AI 发现并存的桌面阅读器").size(16),
-            text("Iced 重写版本优先服务日常阅读、检索、发现与导入流2程，保留安静克制的桌面质感，而不是追求旧界面的全量平移。").size(15),
+            text("Rust + Iced 实现的古诗词发现与收藏应用").size(16),
+            text("作者：puraz，邮箱：puraz2258@gmail.com").size(15),
         ]
         .spacing(8),
     )

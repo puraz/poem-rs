@@ -8,6 +8,9 @@ use super::super::message::Message;
 
 const ICON_FAVORITE: &str = "assets/icons/favorite-outline.svg";
 const ICON_FAVORITE_FILLED: &str = "assets/icons/favorite-filled.svg";
+const LIBRARY_STAGE_PADDING: [u16; 2] = [24, 24];
+const LIBRARY_SEARCH_PADDING: [u16; 2] = [16, 18];
+const LIBRARY_ITEM_PADDING: [u16; 2] = [18, 22];
 
 pub fn view<'a>(
     poems: Vec<Poem>,
@@ -33,7 +36,7 @@ pub fn view<'a>(
         .spacing(14)
         .align_y(Alignment::Center),
     )
-    .padding([18, 20])
+    .padding(LIBRARY_SEARCH_PADDING)
     .width(Length::Fill)
     .style(theme::library_search_shell);
 
@@ -75,7 +78,7 @@ pub fn view<'a>(
                 ]
                 .spacing(10),
             )
-            .padding([22, 28])
+            .padding(LIBRARY_ITEM_PADDING)
             .width(Length::Fill)
             .style(move |active_theme| {
                 if selected {
@@ -106,7 +109,7 @@ pub fn view<'a>(
     )
     .width(Length::Fill)
     .height(Length::Fill)
-    .padding([28, 28])
+    .padding(LIBRARY_STAGE_PADDING)
     .style(theme::library_stage)
     .into()
 }
