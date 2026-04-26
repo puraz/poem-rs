@@ -8,6 +8,8 @@ use iced::{theme, widget::text_editor};
 
 use super::message::{ContentMode, DetailTool, Modal, ThemeChoice};
 
+const MASKED_API_KEY_SENTINEL: &str = "__saved_api_key__";
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ToastState {
     pub message: String,
@@ -47,6 +49,7 @@ pub struct SettingsForm {
     pub base_url: String,
     pub model: String,
     pub api_key: String,
+    pub api_key_masked: bool,
     pub allow_file_fallback: bool,
     pub mode_label: String,
     pub warning: String,
@@ -61,7 +64,8 @@ impl SettingsForm {
         } else {
             String::new()
         };
-        let api_key = if secret.is_some() && KeyringSecretStore::is_available() {
+        let has_saved_api_key = secret.is_some();
+        let api_key = if has_saved_api_key {
             String::new()
         } else {
             file_store.load_api_key().ok().flatten().unwrap_or_default()
@@ -71,6 +75,7 @@ impl SettingsForm {
             base_url: config.settings.base_url.clone(),
             model: config.settings.model.clone(),
             api_key,
+            api_key_masked: has_saved_api_key,
             allow_file_fallback: config.allow_file_fallback,
             mode_label: config
                 .settings
@@ -100,6 +105,51 @@ impl SettingsForm {
     pub fn rehydrated(mut persisted: Self, warning: impl Into<String>) -> Self {
         persisted.warning = warning.into();
         persisted
+    }
+
+    pub fn api_key_input_value(&self) -> &str {
+        if self.api_key_masked {
+            MASKED_API_KEY_SENTINEL
+        } else {
+            &self.api_key
+        }
+    }
+
+    pub fn set_api_key_input(&mut self, value: String) {
+        if !self.api_key_masked {
+            self.api_key = value;
+            return;
+        }
+
+        if let Some(suffix) = value.strip_prefix(MASKED_API_KEY_SENTINEL) {
+            if suffix.is_empty() {
+                return;
+            }
+
+            self.api_key = suffix.to_string();
+            self.api_key_masked = false;
+            return;
+        }
+
+        self.api_key.clear();
+        self.api_key_masked = false;
+
+        if !MASKED_API_KEY_SENTINEL.starts_with(&value) {
+            self.api_key = value;
+        }
+    }
+
+    pub fn api_key_for_save(&self) -> Option<&str> {
+        if self.api_key_masked {
+            return None;
+        }
+
+        let trimmed = self.api_key.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
     }
 }
 
@@ -511,8 +561,8 @@ mod tests {
     use iced::theme::Mode;
 
     use super::{
-        AppState, AppreciationState, ContentMode, Modal, SettingsForm, ThemeChoice, ToastState,
-        discovery_poem_excerpt, filter_poems, soft_wrap,
+        AppState, AppreciationState, ContentMode, MASKED_API_KEY_SENTINEL, Modal, SettingsForm,
+        ThemeChoice, ToastState, discovery_poem_excerpt, filter_poems, soft_wrap,
     };
 
     fn poem(id: &str, title: &str, author: &str, content: &str) -> Poem {
@@ -558,6 +608,7 @@ mod tests {
             base_url: " ".into(),
             model: "".into(),
             api_key: String::new(),
+            api_key_masked: false,
             allow_file_fallback: false,
             mode_label: String::new(),
             warning: String::new(),
@@ -566,6 +617,60 @@ mod tests {
         let settings = form.into_settings();
         assert_eq!(settings.base_url, crate::config::ai::DEFAULT_BASE_URL);
         assert_eq!(settings.model, crate::config::ai::DEFAULT_MODEL);
+    }
+
+    #[test]
+    fn masked_api_key_uses_secure_placeholder_and_skips_save() {
+        let form = SettingsForm {
+            api_key_masked: true,
+            ..SettingsForm::default()
+        };
+
+        assert_eq!(form.api_key_input_value(), MASKED_API_KEY_SENTINEL);
+        assert_eq!(form.api_key_for_save(), None);
+    }
+
+    #[test]
+    fn appending_to_masked_api_key_replaces_placeholder_with_new_value() {
+        let mut form = SettingsForm {
+            api_key_masked: true,
+            ..SettingsForm::default()
+        };
+
+        form.set_api_key_input(format!("{MASKED_API_KEY_SENTINEL}sk-new-key"));
+
+        assert_eq!(form.api_key, "sk-new-key");
+        assert!(!form.api_key_masked);
+        assert_eq!(form.api_key_for_save(), Some("sk-new-key"));
+    }
+
+    #[test]
+    fn replacing_masked_api_key_with_paste_uses_new_value_directly() {
+        let mut form = SettingsForm {
+            api_key_masked: true,
+            ..SettingsForm::default()
+        };
+
+        form.set_api_key_input("sk-pasted-key".into());
+
+        assert_eq!(form.api_key, "sk-pasted-key");
+        assert!(!form.api_key_masked);
+        assert_eq!(form.api_key_for_save(), Some("sk-pasted-key"));
+    }
+
+    #[test]
+    fn deleting_masked_api_key_exits_placeholder_mode_without_saving() {
+        let mut form = SettingsForm {
+            api_key_masked: true,
+            ..SettingsForm::default()
+        };
+
+        let shortened_mask = &MASKED_API_KEY_SENTINEL[..MASKED_API_KEY_SENTINEL.len() - 1];
+        form.set_api_key_input(shortened_mask.to_string());
+
+        assert_eq!(form.api_key, "");
+        assert!(!form.api_key_masked);
+        assert_eq!(form.api_key_for_save(), None);
     }
 
     #[test]

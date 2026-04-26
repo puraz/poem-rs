@@ -3,6 +3,7 @@ use iced::{Alignment, Color, Element, Length, Theme};
 
 use crate::ui::components::{
     ButtonKind, compact_button, field_input, input_block, modal_frame, modal_header_with_close,
+    secure_field_input,
 };
 use crate::ui::message::Message;
 use crate::ui::state::SettingsForm;
@@ -22,7 +23,8 @@ pub fn view<'a>(form: &'a SettingsForm) -> Element<'a, Message> {
         ),
         input_block(
             "API Key",
-            field_input("输入 API Key", &form.api_key).on_input(Message::SettingsApiKeyChanged),
+            secure_field_input("输入 API Key", form.api_key_input_value())
+                .on_input(Message::SettingsApiKeyChanged),
         ),
         fallback_section(form.allow_file_fallback),
     ]

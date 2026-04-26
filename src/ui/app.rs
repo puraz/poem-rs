@@ -242,7 +242,7 @@ impl PoemApp {
                 Task::none()
             }
             Message::SettingsApiKeyChanged(value) => {
-                self.state.settings_form.api_key = value;
+                self.state.settings_form.set_api_key_input(value);
                 Task::none()
             }
             Message::SettingsFallbackChanged(value) => {
@@ -252,7 +252,12 @@ impl PoemApp {
             Message::SaveSettings => {
                 self.ai_config.settings = self.state.settings_form.into_settings();
                 self.ai_config.allow_file_fallback = self.state.settings_form.allow_file_fallback;
-                let api_key = self.state.settings_form.api_key.clone();
+                let api_key = self
+                    .state
+                    .settings_form
+                    .api_key_for_save()
+                    .unwrap_or_default()
+                    .to_string();
                 Task::perform(
                     task::save_settings(
                         self.paths.clone(),

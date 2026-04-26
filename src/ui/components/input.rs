@@ -16,6 +16,13 @@ pub fn field_input<'a, Message: Clone + 'a>(
         .style(theme::text_input_default)
 }
 
+pub fn secure_field_input<'a, Message: Clone + 'a>(
+    placeholder: &'a str,
+    value: &'a str,
+) -> TextInput<'a, Message> {
+    field_input(placeholder, value).secure(true)
+}
+
 pub fn search_input<'a, Message: Clone + 'a>(
     placeholder: &'a str,
     value: &'a str,
