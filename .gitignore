@@ -1,4 +1,5 @@
 .omx/
-.codex
-.claude
+.codex/
+.claude/
+.idea
 target
