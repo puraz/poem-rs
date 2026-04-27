@@ -311,21 +311,19 @@ pub fn toast_message_text(theme: &Theme) -> container::Style {
 }
 
 pub fn appreciation_panel(theme: &Theme) -> container::Style {
-    let t = tokens(theme);
-
     let (background, border_color, text_color, shadow_style) = if is_light(theme) {
         (
-            color(0xF2EAE2),
-            color(0xE4D2C4),
+            color(0xF8F4EE),
+            color(0xE7DDD2),
             color(0x4E4540),
-            shadow(t.shadow, 0.0, 8.0, 24.0),
+            Shadow::default(),
         )
     } else {
         (
-            color(0x332D29),
-            Color::from_rgba8(229, 211, 176, 0.16),
-            color(0xDED6CD),
-            shadow(t.shadow, 0.0, 6.0, 18.0),
+            color(0x2D2B29),
+            Color::from_rgba8(229, 211, 176, 0.10),
+            color(0xD8D1C8),
+            Shadow::default(),
         )
     };
 
