@@ -250,7 +250,7 @@ impl PoemApp {
                 Task::none()
             }
             Message::SaveSettings => {
-                self.ai_config.settings = self.state.settings_form.into_settings();
+                self.ai_config.settings = self.state.settings_form.to_settings();
                 self.ai_config.allow_file_fallback = self.state.settings_form.allow_file_fallback;
                 let api_key = self
                     .state

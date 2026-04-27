@@ -86,7 +86,7 @@ impl SettingsForm {
         }
     }
 
-    pub fn into_settings(&self) -> AiSettings {
+    pub fn to_settings(&self) -> AiSettings {
         AiSettings {
             base_url: if self.base_url.trim().is_empty() {
                 AiSettings::default().base_url
@@ -614,7 +614,7 @@ mod tests {
             warning: String::new(),
         };
 
-        let settings = form.into_settings();
+        let settings = form.to_settings();
         assert_eq!(settings.base_url, crate::config::ai::DEFAULT_BASE_URL);
         assert_eq!(settings.model, crate::config::ai::DEFAULT_MODEL);
     }
