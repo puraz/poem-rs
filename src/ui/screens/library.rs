@@ -8,9 +8,9 @@ use super::super::message::Message;
 
 const ICON_FAVORITE: &str = "assets/icons/favorite-outline.svg";
 const ICON_FAVORITE_FILLED: &str = "assets/icons/favorite-filled.svg";
-const LIBRARY_STAGE_PADDING: [u16; 2] = [24, 24];
-const LIBRARY_SEARCH_PADDING: [u16; 2] = [16, 18];
-const LIBRARY_ITEM_PADDING: [u16; 2] = [18, 22];
+const LIBRARY_STAGE_PADDING: [u16; 2] = [22, 20];
+const LIBRARY_SEARCH_PADDING: [u16; 2] = [14, 16];
+const LIBRARY_ITEM_PADDING: [u16; 2] = [16, 18];
 
 pub fn view<'a>(
     poems: Vec<Poem>,
@@ -33,7 +33,7 @@ pub fn view<'a>(
                 .width(Length::Fill)
                 .style(theme::text_input_search_embedded),
         ]
-        .spacing(14)
+        .spacing(12)
         .align_y(Alignment::Center),
     )
     .padding(LIBRARY_SEARCH_PADDING)
@@ -105,7 +105,7 @@ pub fn view<'a>(
                 .style(theme::scrollable_style)
                 .height(Length::Fill),
         ]
-        .spacing(22),
+        .spacing(20),
     )
     .width(Length::Fill)
     .height(Length::Fill)

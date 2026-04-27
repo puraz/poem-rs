@@ -20,7 +20,12 @@ use super::screens::{about_modal, discovery_modal, edit_modal, library, settings
 use super::state::{AppState, SettingsForm};
 use super::task;
 use super::theme;
-const DETAIL_PANE_PADDING: [u16; 2] = [24, 28];
+
+const SIDEBAR_WIDTH: u32 = 252;
+const MIDDLE_PANE_PORTION: u16 = 12;
+const DETAIL_PANE_PORTION: u16 = 7;
+const DETAIL_PANE_PADDING: [u16; 2] = [22, 24];
+const DETAIL_PANE_MAX_WIDTH: f32 = 608.0;
 
 pub fn run() -> Result<()> {
     let env_filter = EnvFilter::try_from_default_env()
@@ -433,10 +438,10 @@ impl PoemApp {
                 self.sidebar_view(),
                 content_vertical_divider::<Message>(),
                 container(self.middle_pane())
-                    .width(Length::FillPortion(5))
+                    .width(Length::FillPortion(MIDDLE_PANE_PORTION))
                     .height(Length::Fill),
                 container(self.detail_pane())
-                    .width(Length::FillPortion(3))
+                    .width(Length::FillPortion(DETAIL_PANE_PORTION))
                     .height(Length::Fill),
             ]
             .spacing(0)
@@ -504,18 +509,18 @@ impl PoemApp {
     fn sidebar_view(&self) -> Element<'_, Message> {
         let header = column![
             row![
-                sidebar_icon::<Message>(ICON_BRAND, 30.0, SidebarIconTone::Accent),
+                sidebar_icon::<Message>(ICON_BRAND, 28.0, SidebarIconTone::Accent),
                 column![
                     container(text("诗词").size(22)).style(theme::title_text),
                     container(text("发现诗意之美").size(13)).style(theme::subdued_text),
                 ]
-                .spacing(6),
+                .spacing(4),
             ]
-            .spacing(14)
+            .spacing(12)
             .align_y(Alignment::Center),
             sidebar_divider::<Message>(),
         ]
-        .spacing(18);
+        .spacing(16);
 
         let main_nav = column![
             sidebar_primary_button(ICON_PLUS, "发现新诗词")
@@ -535,7 +540,7 @@ impl PoemApp {
             sidebar_nav_button(ICON_ABOUT, "关于", self.state.active_modal == Modal::About)
                 .on_press(Message::OpenModal(Modal::About)),
         ]
-        .spacing(12);
+        .spacing(10);
 
         let theme_picker: Element<'_, Message> = if self.state.theme_panel_open {
             column![
@@ -545,7 +550,7 @@ impl PoemApp {
                     self.state.theme_panel_open,
                 ),
             ]
-            .spacing(10)
+            .spacing(8)
             .width(Length::Fill)
             .into()
         } else {
@@ -566,19 +571,19 @@ impl PoemApp {
             )
             .on_press(Message::OpenModal(Modal::Settings)),
         ]
-        .spacing(16);
+        .spacing(14);
 
         nav_surface(
             column![
                 header,
-                Space::new().height(Length::Fixed(16.0)),
+                Space::new().height(Length::Fixed(14.0)),
                 main_nav,
                 Space::new().height(Length::Fill),
                 footer,
             ]
             .spacing(0),
         )
-        .width(296)
+        .width(SIDEBAR_WIDTH)
         .height(Length::Fill)
         .into()
     }
@@ -711,10 +716,10 @@ impl PoemApp {
 
         let content = column![
             action_row,
-            Space::new().height(Length::Fixed(28.0)),
+            Space::new().height(Length::Fixed(24.0)),
             container(reading_column)
                 .width(Length::Fill)
-                .max_width(620)
+                .max_width(DETAIL_PANE_MAX_WIDTH)
                 .center_x(Length::Fill),
         ]
         .spacing(0);
@@ -816,14 +821,14 @@ fn sidebar_primary_button<'a>(
                 sidebar_icon::<Message>(icon_path, 18.0, SidebarIconTone::Inverse),
                 text(label).size(16),
             ]
-            .spacing(10)
+            .spacing(8)
             .align_y(Alignment::Center),
         )
         .width(Length::Fill)
         .center_x(Length::Fill),
     )
     .width(Length::Fill)
-    .padding([18, 22])
+    .padding([16, 18])
     .style(theme::button_sidebar_primary)
 }
 
@@ -841,16 +846,16 @@ fn sidebar_nav_button<'a>(
     button(
         container(
             row![
-                sidebar_icon::<Message>(icon_path, 22.0, icon_tone),
-                text(label).size(17),
+                sidebar_icon::<Message>(icon_path, 20.0, icon_tone),
+                text(label).size(16),
             ]
-            .spacing(14)
+            .spacing(11)
             .align_y(Alignment::Center),
         )
         .width(Length::Fill),
     )
     .width(Length::Fill)
-    .padding([14, 16])
+    .padding([12, 14])
     .style(if active {
         theme::button_sidebar_nav_active
     } else {
@@ -873,13 +878,13 @@ fn theme_trigger_button<'a>(current_label: &'a str, open: bool) -> button::Butto
                 Space::new().width(Length::Fill),
                 text(current_label).size(12),
             ]
-            .spacing(8)
+            .spacing(6)
             .align_y(Alignment::Center),
         )
         .width(Length::Fill),
     )
     .width(Length::Fill)
-    .padding([12, 14])
+    .padding([10, 12])
     .style(theme::button_sidebar_nav)
     .on_press(Message::ToggleThemePanel)
 }
@@ -896,7 +901,7 @@ fn theme_options_panel<'a>(selected: ThemeChoice) -> Element<'a, Message> {
             column!().spacing(0).width(Length::Fill),
             |column, choice| column.push(theme_option_button(choice, selected)),
         ))
-        .width(Length::Fixed(136.0))
+        .width(Length::Fixed(120.0))
         .padding(4)
         .style(theme::theme_menu_panel),
     )
@@ -915,7 +920,7 @@ fn theme_option_button<'a>(
             .padding([0, 2]),
     )
     .width(Length::Fill)
-    .padding([9, 12])
+    .padding([8, 10])
     .style(if choice == selected {
         theme::button_sidebar_theme_active
     } else {
