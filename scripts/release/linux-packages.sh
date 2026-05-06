@@ -21,7 +21,7 @@ if ! cargo deb --version >/dev/null 2>&1; then
 fi
 
 cargo build --release
-cargo appimage --release
+cargo appimage
 cargo deb --no-build --output target/debian/
 
 echo "AppImage artifacts:"

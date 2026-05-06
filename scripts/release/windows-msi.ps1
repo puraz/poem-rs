@@ -13,8 +13,7 @@ if (-not (cargo wix --version 2>$null)) {
   cargo install cargo-wix
 }
 
-cargo build --release
-cargo wix --no-build
+cargo wix --nocapture
 
 Write-Host "MSI artifacts:" 
 Get-ChildItem -Path target/wix -Filter *.msi -Recurse | ForEach-Object { $_.FullName }

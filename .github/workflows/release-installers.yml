@@ -15,6 +15,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Install WiX Toolset v3
+        shell: pwsh
+        run: choco install wixtoolset --no-progress -y
       - name: Build MSI
         shell: pwsh
         run: ./scripts/release/windows-msi.ps1
@@ -52,6 +55,16 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libfuse2 patchelf desktop-file-utils pkg-config libdbus-1-dev
+      - name: Install appimagetool
+        run: |
+          curl -fsSL -o /usr/local/bin/appimagetool.AppImage \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage
+          chmod +x /usr/local/bin/appimagetool.AppImage
+          sudo tee /usr/local/bin/appimagetool >/dev/null <<'EOF'
+          #!/usr/bin/env bash
+          exec /usr/local/bin/appimagetool.AppImage --appimage-extract-and-run "$@"
+          EOF
+          sudo chmod +x /usr/local/bin/appimagetool
       - name: Build AppImage and DEB
         run: ./scripts/release/linux-packages.sh
       - name: Upload AppImage
