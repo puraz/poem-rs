@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
   <Product
-    Id="*"
-    Name="poem-rs"
-    Language="1033"
-    Version="$(var.CargoVersion)"
-    Manufacturer="poem-rs maintainers"
-    UpgradeCode="DE96989B-5C96-4170-AB92-D2CD9CAC7721"
+      Id="*"
+      Name="poem-rs"
+      Language="1033"
+      Version="$(env.CargoVersion)"  <!-- 关键修改点 1 -->
+      Manufacturer="poem-rs maintainers"
+      UpgradeCode="DE96989B-5C96-4170-AB92-D2CD9CAC7721"
   >
     <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" />
     <MajorUpgrade DowngradeErrorMessage="A newer version of poem-rs is already installed." />
@@ -31,7 +31,11 @@
   <Fragment>
     <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
       <Component Id="MainExecutable" Guid="6F831318-BD0B-493C-9B24-4E4DA7FD7E68">
-        <File Id="PoemRsExe" Source="$(var.CargoTargetBinDir)\\poem-rs.exe" KeyPath="yes" />
+        <File
+            Id="PoemRsExe"
+            Source="$(env.CargoTargetBinDir)\poem-rs.exe"  <!-- 关键修改点 2 -->
+            KeyPath="yes"
+        />
         <Shortcut
           Id="ApplicationStartMenuShortcut"
           Directory="ApplicationProgramsFolder"
