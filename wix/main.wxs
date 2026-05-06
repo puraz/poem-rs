@@ -4,7 +4,7 @@
       Id="*"
       Name="poem-rs"
       Language="1033"
-      Version="$(env.CargoVersion)"  <!-- 关键修改点 1 -->
+      Version="$(env.CargoVersion)"
       Manufacturer="poem-rs maintainers"
       UpgradeCode="DE96989B-5C96-4170-AB92-D2CD9CAC7721"
   >
@@ -33,7 +33,7 @@
       <Component Id="MainExecutable" Guid="6F831318-BD0B-493C-9B24-4E4DA7FD7E68">
         <File
             Id="PoemRsExe"
-            Source="$(env.CargoTargetBinDir)\poem-rs.exe"  <!-- 关键修改点 2 -->
+            Source="$(env.CargoTargetBinDir)\poem-rs.exe"
             KeyPath="yes"
         />
         <Shortcut
