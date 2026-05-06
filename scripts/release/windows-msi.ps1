@@ -13,7 +13,12 @@ if (-not (cargo wix --version 2>$null)) {
   cargo install cargo-wix
 }
 
-cargo wix --nocapture
+$version = cargo metadata --format-version 1 | jq -r '.packages[] | select(.name=="poem-rs") | .version'
+cargo wix `
+  --nocapture `
+  -dCargoVersion="$version" `
+  -dCargoTargetBinDir="target/release"
 
+Write-Host "CargoVersion = $version"
 Write-Host "MSI artifacts:" 
 Get-ChildItem -Path target/wix -Filter *.msi -Recurse | ForEach-Object { $_.FullName }
