@@ -112,24 +112,8 @@ pub fn content_shell(theme: &Theme) -> container::Style {
     container::Style {
         text_color: Some(t.text),
         background: Some(Background::Color(background)),
-        border: Border {
-            color: if is_light(theme) {
-                color(0xEDE3D8)
-            } else {
-                Color::from_rgba8(229, 211, 176, 0.10)
-            },
-            width: 1.0,
-            radius: Radius::default()
-                .top_left(16)
-                .top_right(16)
-                .bottom_right(16)
-                .bottom_left(16),
-        },
-        shadow: if is_light(theme) {
-            shadow(t.shadow, 0.0, 10.0, 24.0)
-        } else {
-            shadow(t.shadow, 0.0, 8.0, 18.0)
-        },
+        border: border(Color::TRANSPARENT, 0.0, 0.0),
+        shadow: Shadow::default(),
         snap: false,
     }
 }

@@ -20,7 +20,6 @@ pub fn page_shell<'a, Message: 'a>(
     widget::container(content)
         .width(Length::Fill)
         .height(Length::Fill)
-        .padding(theme::SPACE_6)
         .style(theme::page_background)
 }
 
