@@ -18,6 +18,9 @@ jobs:
       - name: Install WiX Toolset v3
         shell: pwsh
         run: choco install wixtoolset --no-progress -y
+      - name: Install cargo-wix
+        shell: pwsh
+        run: cargo install cargo-wix --locked
       - name: Debug toolchain and script
         shell: pwsh
         run: |
@@ -28,8 +31,7 @@ jobs:
           Get-Content ./scripts/release/windows-msi.ps1 -Raw
       - name: Build MSI
         shell: pwsh
-        run: |
-          cargo wix --nocapture
+        run: ./scripts/release/windows-msi.ps1
       - name: Upload MSI
         uses: actions/upload-artifact@v4
         if: always()
