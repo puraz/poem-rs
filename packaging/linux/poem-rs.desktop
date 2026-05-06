@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=poem-rs
+Comment=Desktop poetry library and AI-assisted appreciation
+Exec=poem-rs
+Icon=poem-rs
+Terminal=false
+Categories=Education;Utility;
+StartupNotify=true

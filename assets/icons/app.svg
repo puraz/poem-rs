@@ -1,0 +1,27 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="128" y1="80" x2="896" y2="944" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1E273F"/>
+      <stop offset="0.56" stop-color="#2E3D5E"/>
+      <stop offset="1" stop-color="#465976"/>
+    </linearGradient>
+    <filter id="textShadow" x="160" y="180" width="704" height="704" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="10" flood-color="#0F172A" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <rect x="64" y="64" width="896" height="896" rx="204" fill="url(#bg)"/>
+
+  <g filter="url(#textShadow)">
+    <text
+      x="512"
+      y="512"
+      text-anchor="middle"
+      dominant-baseline="middle"
+      fill="#F8EBDD"
+      font-size="520"
+      font-weight="700"
+      font-family="'Noto Serif CJK SC','Source Han Serif SC','Songti SC','STSong','PingFang SC',serif"
+    >诗</text>
+  </g>
+</svg>

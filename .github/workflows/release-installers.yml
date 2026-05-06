@@ -1,0 +1,70 @@
+name: release-installers
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  windows-msi:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build MSI
+        shell: pwsh
+        run: ./scripts/release/windows-msi.ps1
+      - name: Upload MSI
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-msi
+          path: target/wix/*.msi
+          if-no-files-found: warn
+
+  macos-dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install create-dmg
+        run: brew install create-dmg
+      - name: Build DMG
+        run: ./scripts/release/macos-dmg.sh
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: macos-dmg
+          path: target/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
+
+  linux-packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install appimage dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2 patchelf desktop-file-utils
+      - name: Build AppImage and DEB
+        run: ./scripts/release/linux-packages.sh
+      - name: Upload AppImage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-appimage
+          path: target/**/*.AppImage
+          if-no-files-found: warn
+      - name: Upload DEB
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-deb
+          path: target/debian/*.deb
+          if-no-files-found: warn

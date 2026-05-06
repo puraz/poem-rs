@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  <Product
+    Id="*"
+    Name="poem-rs"
+    Language="1033"
+    Version="$(var.CargoVersion)"
+    Manufacturer="poem-rs maintainers"
+    UpgradeCode="DE96989B-5C96-4170-AB92-D2CD9CAC7721"
+  >
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of poem-rs is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Feature Id="ProductFeature" Title="poem-rs" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+    </Feature>
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="poem-rs" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="poem-rs" />
+      </Directory>
+    </Directory>
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Component Id="MainExecutable" Guid="6F831318-BD0B-493C-9B24-4E4DA7FD7E68">
+        <File Id="PoemRsExe" Source="$(var.CargoTargetBinDir)\\poem-rs.exe" KeyPath="yes" />
+        <Shortcut
+          Id="ApplicationStartMenuShortcut"
+          Directory="ApplicationProgramsFolder"
+          Name="poem-rs"
+          Description="Desktop poetry library and AI-assisted appreciation"
+          Target="[#PoemRsExe]"
+          WorkingDirectory="INSTALLFOLDER"
+        />
+        <RemoveFolder Id="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue
+          Root="HKCU"
+          Key="Software\\poem-rs"
+          Name="installed"
+          Type="integer"
+          Value="1"
+          KeyPath="yes"
+        />
+      </Component>
+    </ComponentGroup>
+  </Fragment>
+</Wix>

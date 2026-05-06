@@ -100,3 +100,10 @@ cargo fmt
 cargo test
 cargo run
 ```
+
+## 安装包发布
+
+跨平台安装包发布流程见：
+
+- `docs/release-installers.md`
+- `.github/workflows/release-installers.yml`
