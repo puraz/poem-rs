@@ -19,10 +19,13 @@ $package = $metadata.packages | Where-Object { $_.name -eq "poem-rs" } | Select-
 if (-not $package) {
   throw "Could not resolve package metadata for poem-rs"
 }
-$version = $package.version
+# $version = $package.version
+$version = cargo metadata --format-version 1 | jq -r '.packages[] | select(.name=="poem-rs") | .version'
 cargo wix `
   --nocapture `
-  --target-bin-dir "target/release"
+  --target-bin-dir "target/release" `
+  -dCargoVersion="$version" `
+  -dCargoTargetBinDir="target/release"
 
 if ($LASTEXITCODE -ne 0) {
   throw "cargo wix failed with exit code $LASTEXITCODE"
