@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+$PSNativeCommandUseErrorActionPreference = $true
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repoRoot = Resolve-Path (Join-Path $scriptDir "..\\..")
@@ -13,12 +14,30 @@ if (-not (cargo wix --version 2>$null)) {
   cargo install cargo-wix
 }
 
-$version = cargo metadata --format-version 1 | jq -r '.packages[] | select(.name=="poem-rs") | .version'
+$metadata = cargo metadata --format-version 1 --no-deps | ConvertFrom-Json
+$package = $metadata.packages | Where-Object { $_.name -eq "poem-rs" } | Select-Object -First 1
+if (-not $package) {
+  throw "Could not resolve package metadata for poem-rs"
+}
+$version = $package.version
 cargo wix `
   --nocapture `
-  -dCargoVersion="$version" `
-  -dCargoTargetBinDir="target/release"
+  --target-bin-dir "target/release"
+
+if ($LASTEXITCODE -ne 0) {
+  throw "cargo wix failed with exit code $LASTEXITCODE"
+}
 
 Write-Host "CargoVersion = $version"
 Write-Host "MSI artifacts:" 
-Get-ChildItem -Path target/wix -Filter *.msi -Recurse | ForEach-Object { $_.FullName }
+$msiDir = Join-Path $repoRoot "target\\wix"
+if (-not (Test-Path $msiDir)) {
+  throw "MSI output directory not found: $msiDir"
+}
+
+$msiFiles = Get-ChildItem -Path $msiDir -Filter *.msi -Recurse
+if (-not $msiFiles) {
+  throw "No MSI artifacts found under $msiDir"
+}
+
+$msiFiles | ForEach-Object { $_.FullName }
