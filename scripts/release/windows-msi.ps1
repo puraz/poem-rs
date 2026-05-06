@@ -1,37 +1,40 @@
 $ErrorActionPreference = "Stop"
-$PSNativeCommandUseErrorActionPreference = $true
 
-$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repoRoot = Resolve-Path (Join-Path $scriptDir "..\..")
+# 1. 切换到脚本所在的上级的上级目录（即仓库根目录）
+$repoRoot = Split-Path -Parent $MyInvocation.MyCommand.Path | Split-Path -Parent | Split-Path -Parent
 Set-Location $repoRoot
 
-# 1. 确保 Rust 和 cargo-wix 就绪
+Write-Host "Current working directory: $repoRoot"
+
+# 2. 检查基础环境
 if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
-  throw "cargo is required"
+  throw "cargo is required but not found."
 }
 
+# 3. 安装 cargo-wix (如果不存在)
 if (-not (cargo wix --version 2>$null)) {
   Write-Host "Installing cargo-wix..."
   cargo install cargo-wix --locked
 }
 
-# 2. 提取版本号
+# 4. 获取版本号并设置环境变量
 $version = cargo metadata --format-version 1 | jq -r '.packages[] | select(.name=="poem-rs") | .version'
 Write-Host "CargoVersion = $version"
-
-# 3. 【核心降维打击】设置为系统环境变量
-# cargo-wix 底层调用的 candle.exe/light.exe 会自动读取这些变量
 $env:CargoVersion = $version
-$env:CargoTargetBinDir = Resolve-Path "target\release"
 
-Write-Host "Setting env CargoVersion = $env:CargoVersion"
-Write-Host "Setting env CargoTargetBinDir = $env:CargoTargetBinDir"
+# 5. 设置目标文件夹环境变量 (使用相对路径，避免 PowerShell Resolve-Path 的强校验崩溃)
+$env:CargoTargetBinDir = "target\release"
 
-# 4. 确保 Release 二进制存在 (WiX 需要打包的文件必须真实存在)
+# 6. 编译 Rust 项目 (确保 .exe 文件被生成)
 Write-Host "Building release binary..."
 cargo build --release
 
-# 5. 纯净调用，不带任何可能引发解析错误的 -d 参数
+# 7. 确认 exe 是否存在，提前报错以便调试
+if (-not (Test-Path "$env:CargoTargetBinDir\poem-rs.exe")) {
+    throw "Build succeeded but $env:CargoTargetBinDir\poem-rs.exe was not found!"
+}
+
+# 8. 纯净调用 cargo wix
 Write-Host "Starting cargo wix build..."
 cargo wix --nocapture
 
@@ -39,10 +42,7 @@ if ($LASTEXITCODE -ne 0) {
   throw "cargo wix failed with exit code $LASTEXITCODE"
 }
 
-# 6. 输出产物路径
+# 9. 输出产物
 $msiFiles = Get-ChildItem -Path "target\wix" -Filter *.msi -Recurse
-if (-not $msiFiles) {
-  throw "No MSI artifacts found!"
-}
-
-$msiFiles | ForEach-Object { $_.FullName }
+if (-not $msiFiles) { throw "MSI artifacts not found!" }
+$msiFiles | ForEach-Object { Write-Host "Built artifact: $($_.FullName)" }
