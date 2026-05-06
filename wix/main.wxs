@@ -47,7 +47,6 @@
           Name="installed"
           Type="integer"
           Value="1"
-          KeyPath="yes"
         />
       </Component>
     </ComponentGroup>

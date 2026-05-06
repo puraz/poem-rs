@@ -18,9 +18,18 @@ jobs:
       - name: Install WiX Toolset v3
         shell: pwsh
         run: choco install wixtoolset --no-progress -y
+      - name: Debug toolchain and script
+        shell: pwsh
+        run: |
+          Write-Host "GITHUB_REF=$env:GITHUB_REF"
+          Write-Host "GITHUB_SHA=$env:GITHUB_SHA"
+          cargo --version
+          cargo wix --version
+          Get-Content ./scripts/release/windows-msi.ps1 -Raw
       - name: Build MSI
         shell: pwsh
-        run: ./scripts/release/windows-msi.ps1
+        run: |
+          cargo wix --nocapture
       - name: Upload MSI
         uses: actions/upload-artifact@v4
         if: always()
