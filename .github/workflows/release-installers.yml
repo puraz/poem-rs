@@ -51,7 +51,7 @@ jobs:
       - name: Install appimage dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libfuse2 patchelf desktop-file-utils
+          sudo apt-get install -y libfuse2 patchelf desktop-file-utils pkg-config libdbus-1-dev
       - name: Build AppImage and DEB
         run: ./scripts/release/linux-packages.sh
       - name: Upload AppImage
@@ -68,3 +68,25 @@ jobs:
           name: linux-deb
           path: target/debian/*.deb
           if-no-files-found: warn
+
+  publish-release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [windows-msi, macos-dmg, linux-packages]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: List artifacts
+        run: find release-artifacts -type f -maxdepth 4 -print
+
+      - name: Upload artifacts to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-artifacts/**/*.msi
+            release-artifacts/**/*.dmg
+            release-artifacts/**/*.AppImage
+            release-artifacts/**/*.deb
