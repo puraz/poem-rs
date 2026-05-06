@@ -20,7 +20,7 @@ Write-Host "CargoVersion = $version"
 cargo wix `
   --nocapture `
   -dCargoVersion="$version" `
-  -dCargoTargetBinDir="target/release"
+  -dCargoTargetBinDir='target\release'
 
 if ($LASTEXITCODE -ne 0) {
   throw "cargo wix failed with exit code $LASTEXITCODE"
