@@ -19,12 +19,10 @@
 
   <Fragment>
     <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="ProgramFilesFolder">
+      <Directory Id="ProgramFiles64Folder">
         <Directory Id="INSTALLFOLDER" Name="poem-rs" />
       </Directory>
-      <Directory Id="ProgramMenuFolder">
-        <Directory Id="ApplicationProgramsFolder" Name="poem-rs" />
-      </Directory>
+      <Directory Id="ProgramMenuFolder" />
     </Directory>
   </Fragment>
 
@@ -35,23 +33,16 @@
             Id="PoemRsExe"
             Source="$(env.CargoTargetBinDir)\poem-rs.exe"
             KeyPath="yes"
-        />
-        <Shortcut
-          Id="ApplicationStartMenuShortcut"
-          Directory="ApplicationProgramsFolder"
-          Name="poem-rs"
-          Description="Desktop poetry library and AI-assisted appreciation"
-          Target="[#PoemRsExe]"
-          WorkingDirectory="INSTALLFOLDER"
-        />
-        <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
-        <RegistryValue
-          Root="HKCU"
-          Key="Software\\poem-rs"
-          Name="installed"
-          Type="integer"
-          Value="1"
-        />
+        >
+          <Shortcut
+            Id="ApplicationStartMenuShortcut"
+            Advertise="yes"
+            Directory="ProgramMenuFolder"
+            Name="poem-rs"
+            Description="Desktop poetry library and AI-assisted appreciation"
+            WorkingDirectory="INSTALLFOLDER"
+          />
+        </File>
       </Component>
     </ComponentGroup>
   </Fragment>
