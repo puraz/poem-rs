@@ -40,7 +40,7 @@ if (-not (Test-Path "$env:CargoTargetBinDir\poem-rs.exe")) {
 
 # 8. 纯净调用 cargo wix
 Write-Host "Starting cargo wix build..."
-cargo wix --nocapture --ext WixUIExtension
+cargo wix --nocapture
 
 if ($LASTEXITCODE -ne 0) {
   throw "cargo wix failed with exit code $LASTEXITCODE"
