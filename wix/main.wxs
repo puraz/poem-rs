@@ -34,7 +34,7 @@
       <Directory Id="CommonProgramsFolder">
         <Directory Id="ApplicationProgramsFolder" Name="poem-rs" />
       </Directory>
-      <Directory Id="DesktopFolder" />
+      <Directory Id="CommonDesktopFolder" />
     </Directory>
   </Fragment>
 
@@ -65,7 +65,7 @@
   </Fragment>
 
   <Fragment>
-    <DirectoryRef Id="DesktopFolder">
+    <DirectoryRef Id="CommonDesktopFolder">
       <Component Id="DesktopShortcutComponent" Guid="AF6783C4-526A-493C-90AB-33030A88EB65" Win64="yes">
         <Shortcut
           Id="ApplicationDesktopShortcut"
