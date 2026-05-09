@@ -1,6 +1,6 @@
 [package]
 name = "poem-rs"
-version = "0.1.14"
+version = "0.1.15"
 edition = "2024"
 description = "A Rust + iced desktop poetry app."
 readme = "README.md"
@@ -8,7 +8,7 @@ readme = "README.md"
 [dependencies]
 anyhow = "1.0.102"
 directories = "6.0.0"
-iced = { version = "0.14.0", features = ["tokio", "svg"] }
+iced = { version = "0.14.0", features = ["image", "tokio", "svg"] }
 keyring = { version = "3.6.3", default-features = false, features = ["apple-native", "windows-native", "sync-secret-service"] }
 libc = "0.2.185"
 reqwest = { version = "0.13.2", default-features = false, features = ["blocking", "json", "rustls"] }
@@ -52,3 +52,6 @@ assets = [
 [package.metadata.appimage]
 desktop_entry = "packaging/linux/poem-rs.desktop"
 icon = "assets/icons/app.png"
+
+[build-dependencies]
+winres = "0.1.12"

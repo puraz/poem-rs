@@ -26,6 +26,7 @@ const MIDDLE_PANE_PORTION: u16 = 12;
 const DETAIL_PANE_PORTION: u16 = 7;
 const DETAIL_PANE_PADDING: [u16; 2] = [22, 24];
 const DETAIL_PANE_MAX_WIDTH: f32 = 608.0;
+const APP_ICON_BYTES: &[u8] = include_bytes!("../../assets/icons/app.png");
 
 pub fn run() -> Result<()> {
     let env_filter = EnvFilter::try_from_default_env()
@@ -36,6 +37,8 @@ pub fn run() -> Result<()> {
         .with_env_filter(env_filter)
         .try_init();
 
+    let window_icon = window::icon::from_file_data(APP_ICON_BYTES, None)?;
+
     iced::application(PoemApp::new, PoemApp::update, PoemApp::view)
         .subscription(PoemApp::subscription)
         .theme(PoemApp::theme)
@@ -43,6 +46,7 @@ pub fn run() -> Result<()> {
             size: Size::new(1200.0, 800.0),
             min_size: Some(Size::new(1200.0, 800.0)),
             position: window::Position::Centered,
+            icon: Some(window_icon),
             ..Default::default()
         })
         .run()?;

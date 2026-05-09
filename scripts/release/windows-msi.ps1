@@ -18,7 +18,11 @@ if (-not (cargo wix --version 2>$null)) {
 }
 
 # 4. 获取版本号并设置环境变量
-$version = cargo metadata --format-version 1 | jq -r '.packages[] | select(.name=="poem-rs") | .version'
+$metadata = cargo metadata --format-version 1 | ConvertFrom-Json
+$version = ($metadata.packages | Where-Object { $_.name -eq "poem-rs" } | Select-Object -First 1).version
+if (-not $version) {
+  throw "Failed to resolve poem-rs package version from cargo metadata."
+}
 Write-Host "CargoVersion = $version"
 $env:CargoVersion = $version
 
@@ -36,7 +40,7 @@ if (-not (Test-Path "$env:CargoTargetBinDir\poem-rs.exe")) {
 
 # 8. 纯净调用 cargo wix
 Write-Host "Starting cargo wix build..."
-cargo wix --nocapture
+cargo wix --nocapture --ext WixUIExtension
 
 if ($LASTEXITCODE -ne 0) {
   throw "cargo wix failed with exit code $LASTEXITCODE"
