@@ -15,6 +15,7 @@ use super::components::{
     SurfaceKind, ToastTone, loading_indicator, modal_overlay, nav_surface, page_shell, surface,
     toast, toast_host,
 };
+use super::assets;
 use super::message::{ContentMode, DetailTool, Message, Modal, ThemeChoice};
 use super::screens::{about_modal, discovery_modal, edit_modal, library, settings_modal};
 use super::state::{AppState, SettingsForm};
@@ -513,7 +514,7 @@ impl PoemApp {
     fn sidebar_view(&self) -> Element<'_, Message> {
         let header = column![
             row![
-                sidebar_icon::<Message>(ICON_BRAND, 28.0, SidebarIconTone::Accent),
+                sidebar_icon::<Message>(assets::BRAND, 28.0, SidebarIconTone::Accent),
                 column![
                     container(text("诗词").size(22)).style(theme::title_text),
                     container(text("发现诗意之美").size(13)).style(theme::subdued_text),
@@ -527,21 +528,21 @@ impl PoemApp {
         .spacing(16);
 
         let main_nav = column![
-            sidebar_primary_button(ICON_PLUS, "发现新诗词")
+            sidebar_primary_button(assets::PLUS, "发现新诗词")
                 .on_press(Message::OpenModal(Modal::Discovery)),
             sidebar_nav_button(
-                ICON_HOME,
+                assets::HOME,
                 "首页",
                 self.state.content_mode == ContentMode::Library
             )
             .on_press(Message::SwitchContentMode(ContentMode::Library)),
             sidebar_nav_button(
-                ICON_FAVORITE,
+                assets::FAVORITE,
                 "收藏夹",
                 self.state.content_mode == ContentMode::Favorites
             )
             .on_press(Message::SwitchContentMode(ContentMode::Favorites)),
-            sidebar_nav_button(ICON_ABOUT, "关于", self.state.active_modal == Modal::About)
+            sidebar_nav_button(assets::ABOUT, "关于", self.state.active_modal == Modal::About)
                 .on_press(Message::OpenModal(Modal::About)),
         ]
         .spacing(10);
@@ -569,7 +570,7 @@ impl PoemApp {
             container(theme_picker).width(Length::Fill),
             sidebar_divider::<Message>(),
             sidebar_nav_button(
-                ICON_SETTINGS,
+                assets::SETTINGS,
                 "设置",
                 self.state.active_modal == Modal::Settings
             )
@@ -636,9 +637,9 @@ impl PoemApp {
         let favorite_hovered = self.state.hovered_detail_tool == Some(DetailTool::Favorite);
         let is_light_theme = matches!(self.state.resolved_theme(), ThemeChoice::Songyanjian);
         let favorite_icon = if poem.is_favorite {
-            ICON_FAVORITE_FILLED
+            assets::FAVORITE_FILLED
         } else {
-            ICON_FAVORITE
+            assets::FAVORITE
         };
         let favorite_tone = if poem.is_favorite && favorite_hovered && is_light_theme {
             SidebarIconTone::Inverse
@@ -658,14 +659,14 @@ impl PoemApp {
                 Some(Message::ToggleFavorite)
             ),
             detail_icon_action(
-                ICON_EDIT,
+                assets::EDIT,
                 SidebarIconTone::Default,
                 false,
                 DetailTool::Edit,
                 Some(Message::OpenEditModal),
             ),
             detail_icon_action(
-                ICON_APPRECIATION,
+                assets::APPRECIATION,
                 SidebarIconTone::Default,
                 false,
                 DetailTool::Appreciation,
@@ -783,17 +784,6 @@ fn dismiss_toast_later(revision: u64) -> Task<Message> {
     )
 }
 
-const ICON_BRAND: &str = "assets/icons/brand-book.svg";
-const ICON_PLUS: &str = "assets/icons/plus.svg";
-const ICON_HOME: &str = "assets/icons/home.svg";
-const ICON_FAVORITE: &str = "assets/icons/favorite-outline.svg";
-const ICON_FAVORITE_FILLED: &str = "assets/icons/favorite-filled.svg";
-const ICON_ABOUT: &str = "assets/icons/about.svg";
-const ICON_SETTINGS: &str = "assets/icons/settings.svg";
-const ICON_THEME: &str = "assets/icons/theme.svg";
-const ICON_EDIT: &str = "assets/icons/edit.svg";
-const ICON_APPRECIATION: &str = "assets/icons/appreciation.svg";
-
 #[derive(Debug, Clone, Copy)]
 enum SidebarIconTone {
     Accent,
@@ -816,7 +806,7 @@ fn content_vertical_divider<'a, Message: 'a>() -> iced::widget::Container<'a, Me
 }
 
 fn sidebar_primary_button<'a>(
-    icon_path: &'static str,
+    icon_path: &'static [u8],
     label: &'a str,
 ) -> button::Button<'a, Message> {
     button(
@@ -837,7 +827,7 @@ fn sidebar_primary_button<'a>(
 }
 
 fn sidebar_nav_button<'a>(
-    icon_path: &'static str,
+    icon_path: &'static [u8],
     label: &'a str,
     active: bool,
 ) -> button::Button<'a, Message> {
@@ -877,7 +867,7 @@ fn theme_trigger_button<'a>(current_label: &'a str, open: bool) -> button::Butto
     button(
         container(
             row![
-                sidebar_icon::<Message>(ICON_THEME, 18.0, icon_tone),
+                sidebar_icon::<Message>(assets::THEME, 18.0, icon_tone),
                 text("主题").size(15),
                 Space::new().width(Length::Fill),
                 text(current_label).size(12),
@@ -934,7 +924,7 @@ fn theme_option_button<'a>(
 }
 
 fn detail_icon_action<'a>(
-    icon_path: &'static str,
+    icon_path: &'static [u8],
     icon_tone: SidebarIconTone,
     active: bool,
     tool: DetailTool,
@@ -972,11 +962,11 @@ fn detail_icon_action<'a>(
 }
 
 fn sidebar_icon<'a, Message: 'a>(
-    icon_path: &'static str,
+    icon_path: &'static [u8],
     size: f32,
     tone: SidebarIconTone,
 ) -> Element<'a, Message> {
-    iced::widget::svg(icon_path)
+    iced::widget::svg(assets::svg_handle(icon_path))
         .width(Length::Fixed(size))
         .height(Length::Fixed(size))
         .style(move |theme: &Theme, _status| iced::widget::svg::Style {

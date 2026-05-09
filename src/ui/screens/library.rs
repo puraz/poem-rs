@@ -2,12 +2,9 @@ use iced::widget::{button, column, container, row, scrollable, svg, text, text_i
 use iced::{Alignment, Element, Fill, Length, Theme};
 
 use crate::domain::Poem;
-use crate::ui::theme;
+use crate::ui::{assets, theme};
 
 use super::super::message::Message;
-
-const ICON_FAVORITE: &str = "assets/icons/favorite-outline.svg";
-const ICON_FAVORITE_FILLED: &str = "assets/icons/favorite-filled.svg";
 const LIBRARY_STAGE_PADDING: [u16; 2] = [22, 20];
 const LIBRARY_SEARCH_PADDING: [u16; 2] = [14, 16];
 const LIBRARY_ITEM_PADDING: [u16; 2] = [16, 18];
@@ -20,7 +17,7 @@ pub fn view<'a>(
 ) -> Element<'a, Message> {
     let search = container(
         row![
-            svg("assets/icons/search.svg")
+            svg(assets::svg_handle(assets::SEARCH))
                 .width(Length::Fixed(20.0))
                 .height(Length::Fixed(20.0))
                 .style(|active_theme: &Theme, _status| svg::Style {
@@ -116,12 +113,12 @@ pub fn view<'a>(
 
 fn favorite_icon<'a>(is_favorite: bool) -> Element<'a, Message> {
     let icon_path = if is_favorite {
-        ICON_FAVORITE_FILLED
+        assets::FAVORITE_FILLED
     } else {
-        ICON_FAVORITE
+        assets::FAVORITE
     };
 
-    svg(icon_path)
+    svg(assets::svg_handle(icon_path))
         .width(Length::Fixed(22.0))
         .height(Length::Fixed(22.0))
         .style(move |active_theme: &Theme, _status| svg::Style {

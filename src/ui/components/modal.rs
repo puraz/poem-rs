@@ -3,9 +3,8 @@ use iced::{
     widget::{self, mouse_area, opaque},
 };
 
+use crate::ui::assets;
 use crate::ui::theme;
-
-const ICON_CLOSE: &str = "assets/icons/close.svg";
 
 pub fn modal_header<'a, Message: 'a>(
     title: impl Into<String>,
@@ -28,7 +27,7 @@ pub fn modal_header_with_close<'a, Message: Clone + 'a>(
     subtitle: Option<&'a str>,
     close_message: Message,
 ) -> Element<'a, Message> {
-    let close_icon = widget::svg(ICON_CLOSE)
+    let close_icon = widget::svg(assets::svg_handle(assets::CLOSE))
         .width(Length::Fixed(24.0))
         .height(Length::Fixed(24.0))
         .style(|active_theme: &Theme, _status| widget::svg::Style {
