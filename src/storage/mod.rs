@@ -338,7 +338,7 @@ impl AppDatabase {
 
     fn import_seed_if_needed(&self, conn: &Connection) -> Result<()> {
         let manifest: SeedManifest = serde_json::from_str(MANIFEST_JSON)?;
-        let corpus_checksum = checksum_hex(CORPUS_JSON.as_bytes());
+        let corpus_checksum = normalized_checksum_hex(CORPUS_JSON);
         let expected = manifest
             .files
             .iter()
@@ -496,6 +496,14 @@ fn checksum_hex(bytes: &[u8]) -> String {
     format!("{digest:x}")
 }
 
+fn normalized_checksum_hex(text: &str) -> String {
+    checksum_hex(normalize_newlines(text).as_bytes())
+}
+
+fn normalize_newlines(text: &str) -> String {
+    text.replace("\r\n", "\n").replace('\r', "\n")
+}
+
 fn unique_import_id(poem: &DiscoveredPoem) -> String {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -557,6 +565,21 @@ mod tests {
         let second_count = db.list_poems().expect("list poems 2").len();
         assert_eq!(first_count, second_count);
         let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn embedded_corpus_checksum_is_stable_across_crlf() {
+        let manifest: SeedManifest = serde_json::from_str(MANIFEST_JSON).expect("manifest");
+        let expected = manifest
+            .files
+            .iter()
+            .find(|entry| entry.path == "corpus.json")
+            .expect("corpus entry");
+
+        assert_eq!(normalized_checksum_hex(CORPUS_JSON), expected.sha256);
+
+        let windows_corpus = CORPUS_JSON.replace('\n', "\r\n");
+        assert_eq!(normalized_checksum_hex(&windows_corpus), expected.sha256);
     }
 
     #[test]

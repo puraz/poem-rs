@@ -28,7 +28,7 @@ pub fn append_launch_log(message: &str) {
         return;
     };
 
-    let log_path = paths.config_dir().join("launch.log");
+    let log_path = paths.app_dir().join("launch.log");
     let Ok(mut file) = OpenOptions::new()
         .create(true)
         .append(true)

@@ -22,9 +22,6 @@
     <Feature Id="MainApplication" Title="poem-rs" Level="1" Display="expand" ConfigurableDirectory="INSTALLFOLDER">
       <ComponentRef Id="ApplicationExecutableComponent" />
       <ComponentRef Id="StartMenuShortcutComponent" />
-    </Feature>
-
-    <Feature Id="DesktopShortcutFeature" Title="Desktop shortcut" Description="Create a desktop shortcut for poem-rs." Level="1" Absent="disallow">
       <ComponentRef Id="DesktopShortcutComponent" />
     </Feature>
   </Product>
@@ -37,7 +34,7 @@
       <Directory Id="CommonProgramsFolder">
         <Directory Id="ApplicationProgramsFolder" Name="poem-rs" />
       </Directory>
-      <Directory Id="CommonDesktopFolder" />
+      <Directory Id="DesktopFolder" />
     </Directory>
   </Fragment>
 
@@ -68,7 +65,7 @@
   </Fragment>
 
   <Fragment>
-    <DirectoryRef Id="CommonDesktopFolder">
+    <DirectoryRef Id="DesktopFolder">
       <Component Id="DesktopShortcutComponent" Guid="AF6783C4-526A-493C-90AB-33030A88EB65" Win64="yes">
         <Shortcut
           Id="ApplicationDesktopShortcut"
