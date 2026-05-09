@@ -4,7 +4,7 @@
       Id="*"
       Name="poem-rs"
       Language="1033"
-      Version="$(env.CargoVersion)"
+      Version="$(var.Version)"
       Manufacturer="poem-rs maintainers"
       UpgradeCode="DE96989B-5C96-4170-AB92-D2CD9CAC7721"
   >
@@ -42,17 +42,21 @@
   </Fragment>
 
   <Fragment>
-    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+    <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="ApplicationExecutableComponent" Guid="6F831318-BD0B-493C-9B24-4E4DA7FD7E68" Win64="yes">
-        <File Id="PoemRsExe" Source="$(env.CargoTargetBinDir)\poem-rs.exe" KeyPath="yes" />
+        <File Id="PoemRsExe" Source="$(var.CargoTargetBinDir)\poem-rs.exe" KeyPath="yes" />
       </Component>
+    </DirectoryRef>
+  </Fragment>
 
-      <Component Id="StartMenuShortcutComponent" Guid="16DBE81A-C57B-4D4D-AF42-440F6B6420A6" Directory="ApplicationProgramsFolder" Win64="yes">
+  <Fragment>
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="StartMenuShortcutComponent" Guid="16DBE81A-C57B-4D4D-AF42-440F6B6420A6" Win64="yes">
         <Shortcut
           Id="ApplicationStartMenuShortcut"
           Name="poem-rs"
           Description="Desktop poetry library and AI-assisted appreciation"
-          Target="[INSTALLFOLDER]poem-rs.exe"
+          Target="[#PoemRsExe]"
           WorkingDirectory="INSTALLFOLDER"
           Icon="PoemRsProductIcon"
           IconIndex="0"
@@ -60,19 +64,23 @@
         <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
         <RegistryValue Root="HKLM" Key="Software\poem-rs" Name="StartMenuShortcutInstalled" Type="integer" Value="1" KeyPath="yes" />
       </Component>
+    </DirectoryRef>
+  </Fragment>
 
-      <Component Id="DesktopShortcutComponent" Guid="AF6783C4-526A-493C-90AB-33030A88EB65" Directory="CommonDesktopFolder" Win64="yes">
+  <Fragment>
+    <DirectoryRef Id="CommonDesktopFolder">
+      <Component Id="DesktopShortcutComponent" Guid="AF6783C4-526A-493C-90AB-33030A88EB65" Win64="yes">
         <Shortcut
           Id="ApplicationDesktopShortcut"
           Name="poem-rs"
           Description="Desktop poetry library and AI-assisted appreciation"
-          Target="[INSTALLFOLDER]poem-rs.exe"
+          Target="[#PoemRsExe]"
           WorkingDirectory="INSTALLFOLDER"
           Icon="PoemRsProductIcon"
           IconIndex="0"
         />
         <RegistryValue Root="HKLM" Key="Software\poem-rs" Name="DesktopShortcutInstalled" Type="integer" Value="1" KeyPath="yes" />
       </Component>
-    </ComponentGroup>
+    </DirectoryRef>
   </Fragment>
 </Wix>

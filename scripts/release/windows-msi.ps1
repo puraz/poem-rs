@@ -17,36 +17,27 @@ if (-not (cargo wix --version 2>$null)) {
   cargo install cargo-wix --locked
 }
 
-# 4. 获取版本号并设置环境变量
-$metadata = cargo metadata --format-version 1 | ConvertFrom-Json
-$version = ($metadata.packages | Where-Object { $_.name -eq "poem-rs" } | Select-Object -First 1).version
-if (-not $version) {
-  throw "Failed to resolve poem-rs package version from cargo metadata."
-}
-Write-Host "CargoVersion = $version"
-$env:CargoVersion = $version
+# 4. 设置目标文件夹参数，交给 cargo-wix 的内置变量使用
+$cargoTargetBinDir = "target\release"
 
-# 5. 设置目标文件夹环境变量 (使用相对路径，避免 PowerShell Resolve-Path 的强校验崩溃)
-$env:CargoTargetBinDir = "target\release"
-
-# 6. 编译 Rust 项目 (确保 .exe 文件被生成)
+# 5. 编译 Rust 项目 (确保 .exe 文件被生成)
 Write-Host "Building release binary..."
 cargo build --release
 
-# 7. 确认 exe 是否存在，提前报错以便调试
-if (-not (Test-Path "$env:CargoTargetBinDir\poem-rs.exe")) {
-    throw "Build succeeded but $env:CargoTargetBinDir\poem-rs.exe was not found!"
+# 6. 确认 exe 是否存在，提前报错以便调试
+if (-not (Test-Path "$cargoTargetBinDir\poem-rs.exe")) {
+    throw "Build succeeded but $cargoTargetBinDir\poem-rs.exe was not found!"
 }
 
-# 8. 纯净调用 cargo wix
+# 7. 调用 cargo-wix，复用已生成的 release 二进制，避免重复编译
 Write-Host "Starting cargo wix build..."
-cargo wix --nocapture
+cargo wix --nocapture --no-build --target-bin-dir "$cargoTargetBinDir"
 
 if ($LASTEXITCODE -ne 0) {
   throw "cargo wix failed with exit code $LASTEXITCODE"
 }
 
-# 9. 输出产物
+# 8. 输出产物
 $msiFiles = Get-ChildItem -Path "target\wix" -Filter *.msi -Recurse
 if (-not $msiFiles) { throw "MSI artifacts not found!" }
 $msiFiles | ForEach-Object { Write-Host "Built artifact: $($_.FullName)" }
