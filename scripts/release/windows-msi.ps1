@@ -2,7 +2,7 @@ $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
 
 function Get-RepoRoot {
-  return Split-Path -Parent $PSScriptRoot
+  return (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
 
 function Get-PackageVersion {

@@ -13,7 +13,6 @@
     <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of poem-rs is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <Property Id="ARPPRODUCTICON" Value="PoemRsProductIcon" />
-    <Property Id="ARPNOMODIFY" Value="1" />
     <Property Id="ARPNOREPAIR" Value="1" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
 
@@ -45,8 +44,10 @@
   <Fragment>
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="ApplicationExecutableComponent" Guid="6F831318-BD0B-493C-9B24-4E4DA7FD7E68" Win64="yes">
-        <File Id="PoemRsExe" Source="$(var.CargoTargetBinDir)\poem-rs.exe" KeyPath="yes" Checksum="yes" />
+        <File Id="PoemRsExe" Source="$(var.CargoTargetBinDir)\poem-rs.exe" Checksum="yes" />
+        <RegistryValue Root="HKCU" Key="Software\poem-rs" Name="InstallLocation" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
         <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
+        <RemoveFolder Id="RemoveProgramsFolder" Directory="ProgramsFolder" On="uninstall" />
       </Component>
     </DirectoryRef>
   </Fragment>
