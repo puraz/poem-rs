@@ -8,18 +8,20 @@
       Manufacturer="poem-rs maintainers"
       UpgradeCode="DE96989B-5C96-4170-AB92-D2CD9CAC7721"
   >
-    <Package InstallerVersion="500" Compressed="yes" InstallScope="perMachine" Platform="x64" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of poem-rs is already installed." />
+    <Package InstallerVersion="500" Compressed="yes" InstallScope="perUser" InstallPrivileges="limited" Platform="x64" />
+    <Condition Message="poem-rs currently supports only 64-bit Windows.">VersionNT64</Condition>
+    <MajorUpgrade Schedule="afterInstallInitialize" DowngradeErrorMessage="A newer version of poem-rs is already installed." />
     <MediaTemplate EmbedCab="yes" />
     <Property Id="ARPPRODUCTICON" Value="PoemRsProductIcon" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPNOREPAIR" Value="1" />
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-    <Property Id="WixAppFolder" Value="WixPerMachineFolder" />
 
     <Icon Id="PoemRsProductIcon" SourceFile="assets\icons\app.ico" />
     <WixVariable Id="WixUILicenseRtf" Value="wix\license.rtf" />
-    <UIRef Id="WixUI_FeatureTree" />
+    <UIRef Id="WixUI_InstallDir" />
 
-    <Feature Id="MainApplication" Title="poem-rs" Level="1" Display="expand" ConfigurableDirectory="INSTALLFOLDER">
+    <Feature Id="MainApplication" Title="poem-rs" Level="1">
       <ComponentRef Id="ApplicationExecutableComponent" />
       <ComponentRef Id="StartMenuShortcutComponent" />
       <ComponentRef Id="DesktopShortcutComponent" />
@@ -28,20 +30,23 @@
 
   <Fragment>
     <Directory Id="TARGETDIR" Name="SourceDir">
-      <Directory Id="ProgramFiles64Folder">
-        <Directory Id="INSTALLFOLDER" Name="poem-rs" />
+      <Directory Id="LocalAppDataFolder">
+        <Directory Id="ProgramsFolder" Name="Programs">
+          <Directory Id="INSTALLFOLDER" Name="poem-rs" />
+        </Directory>
       </Directory>
-      <Directory Id="CommonProgramsFolder">
+      <Directory Id="ProgramMenuFolder">
         <Directory Id="ApplicationProgramsFolder" Name="poem-rs" />
       </Directory>
-      <Directory Id="CommonDesktopFolder" />
+      <Directory Id="DesktopFolder" />
     </Directory>
   </Fragment>
 
   <Fragment>
     <DirectoryRef Id="INSTALLFOLDER">
       <Component Id="ApplicationExecutableComponent" Guid="6F831318-BD0B-493C-9B24-4E4DA7FD7E68" Win64="yes">
-        <File Id="PoemRsExe" Source="$(var.CargoTargetBinDir)\poem-rs.exe" KeyPath="yes" />
+        <File Id="PoemRsExe" Source="$(var.CargoTargetBinDir)\poem-rs.exe" KeyPath="yes" Checksum="yes" />
+        <RemoveFolder Id="RemoveInstallFolder" Directory="INSTALLFOLDER" On="uninstall" />
       </Component>
     </DirectoryRef>
   </Fragment>
@@ -58,14 +63,21 @@
           Icon="PoemRsProductIcon"
           IconIndex="0"
         />
-        <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
-        <RegistryValue Root="HKLM" Key="Software\poem-rs" Name="StartMenuShortcutInstalled" Type="integer" Value="1" KeyPath="yes" />
+        <Shortcut
+          Id="ApplicationUninstallShortcut"
+          Name="Uninstall poem-rs"
+          Description="Remove poem-rs from this PC"
+          Target="[SystemFolder]msiexec.exe"
+          Arguments="/x [ProductCode]"
+        />
+        <RemoveFolder Id="RemoveApplicationProgramsFolder" Directory="ApplicationProgramsFolder" On="uninstall" />
+        <RegistryValue Root="HKCU" Key="Software\poem-rs" Name="StartMenuShortcutInstalled" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </DirectoryRef>
   </Fragment>
 
   <Fragment>
-    <DirectoryRef Id="CommonDesktopFolder">
+    <DirectoryRef Id="DesktopFolder">
       <Component Id="DesktopShortcutComponent" Guid="AF6783C4-526A-493C-90AB-33030A88EB65" Win64="yes">
         <Shortcut
           Id="ApplicationDesktopShortcut"
@@ -76,7 +88,7 @@
           Icon="PoemRsProductIcon"
           IconIndex="0"
         />
-        <RegistryValue Root="HKLM" Key="Software\poem-rs" Name="DesktopShortcutInstalled" Type="integer" Value="1" KeyPath="yes" />
+        <RegistryValue Root="HKCU" Key="Software\poem-rs" Name="DesktopShortcutInstalled" Type="integer" Value="1" KeyPath="yes" />
       </Component>
     </DirectoryRef>
   </Fragment>

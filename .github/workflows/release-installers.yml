@@ -9,42 +9,58 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-installers-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   windows-msi:
+    name: windows-msi
     runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install WiX Toolset v3
+      - uses: Swatinem/rust-cache@v2
+      - name: Ensure WiX Toolset v3
         shell: pwsh
-        run: choco install wixtoolset --no-progress -y
+        run: |
+          if (Get-Command candle.exe -ErrorAction SilentlyContinue) {
+            Write-Host "Using preinstalled WiX Toolset."
+            candle.exe -? | Out-Null
+          } else {
+            choco install wixtoolset --no-progress -y
+          }
       - name: Install cargo-wix
         shell: pwsh
         run: cargo install cargo-wix --locked
-      - name: Debug toolchain and script
-        shell: pwsh
-        run: |
-          Write-Host "GITHUB_REF=$env:GITHUB_REF"
-          Write-Host "GITHUB_SHA=$env:GITHUB_SHA"
-          cargo --version
-          cargo wix --version
-          Get-Content ./scripts/release/windows-msi.ps1 -Raw
       - name: Build MSI
         shell: pwsh
+        env:
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_SIGNTOOL_TIMESTAMP_URL: ${{ secrets.WINDOWS_SIGNTOOL_TIMESTAMP_URL }}
         run: ./scripts/release/windows-msi.ps1
       - name: Upload MSI
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: windows-msi
-          path: target/wix/*.msi
-          if-no-files-found: warn
+          path: |
+            target/wix/*.msi
+            target/wix/*.msi.sha256
+          if-no-files-found: error
+          retention-days: 14
 
   macos-dmg:
     runs-on: macos-latest
+    env:
+      CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: Install create-dmg
         run: brew install create-dmg
       - name: Build DMG
@@ -59,9 +75,12 @@ jobs:
 
   linux-packages:
     runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
       - name: Install appimage dependencies
         run: |
           sudo apt-get update
@@ -99,7 +118,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: release-artifacts
 
@@ -111,6 +130,7 @@ jobs:
         with:
           files: |
             release-artifacts/**/*.msi
+            release-artifacts/**/*.sha256
             release-artifacts/**/*.dmg
             release-artifacts/**/*.AppImage
             release-artifacts/**/*.deb
