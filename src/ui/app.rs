@@ -33,7 +33,8 @@ pub fn run() -> Result<()> {
     let env_filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new("info"))
         .add_directive("icu_provider=error".parse().unwrap())
-        .add_directive("icu_segmenter=error".parse().unwrap());
+        .add_directive("icu_segmenter=error".parse().unwrap())
+        .add_directive("fontdb=error".parse().unwrap());
     let _ = tracing_subscriber::fmt()
         .with_env_filter(env_filter)
         .try_init();
