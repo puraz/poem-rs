@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
@@ -580,6 +580,42 @@ mod tests {
 
         let windows_corpus = CORPUS_JSON.replace('\n', "\r\n");
         assert_eq!(normalized_checksum_hex(&windows_corpus), expected.sha256);
+    }
+
+    #[test]
+    fn bootstrap_seeds_poems_with_punctuation_and_completeness() {
+        let path = temp_db_path("seed-punctuation");
+        let db = AppDatabase::new(&path);
+        db.bootstrap().expect("bootstrap");
+
+        let su_shi = db
+            .get_poem("song.su-shi.shui-diao-ge-tou")
+            .expect("get poem")
+            .expect("seed poem exists");
+        assert_eq!(
+            su_shi.content,
+            "明月几时有？\n把酒问青天。\n不知天上宫阙，今夕是何年。\n我欲乘风归去，又恐琼楼玉宇，高处不胜寒。\n起舞弄清影，何似在人间。\n转朱阁，低绮户，照无眠。\n不应有恨，何事长向别时圆？\n人有悲欢离合，月有阴晴圆缺，此事古难全。\n但愿人长久，千里共婵娟。"
+        );
+
+        let li_bai = db
+            .get_poem("tang.li-bai.jing-ye-si")
+            .expect("get poem")
+            .expect("seed poem exists");
+        assert_eq!(
+            li_bai.content,
+            "床前明月光，\n疑是地上霜。\n举头望明月，\n低头思故乡。"
+        );
+
+        let sheng_sheng_man = db
+            .get_poem("song.li-qing-zhao.sheng-sheng-man")
+            .expect("get poem")
+            .expect("seed poem exists");
+        assert_eq!(
+            sheng_sheng_man.content,
+            "寻寻觅觅，冷冷清清，凄凄惨惨戚戚。\n乍暖还寒时候，最难将息。\n三杯两盏淡酒，怎敌他、晚来风急！\n雁过也，正伤心，却是旧时相识。\n满地黄花堆积。憔悴损，如今有谁堪摘？\n守着窗儿，独自怎生得黑？\n梧桐更兼细雨，到黄昏、点点滴滴。\n这次第，怎一个愁字了得！"
+        );
+
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

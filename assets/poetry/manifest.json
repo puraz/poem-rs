@@ -3,7 +3,7 @@
   "files": [
     {
       "path": "corpus.json",
-      "sha256": "e89b4cc2078e5bebe4e351bb3621308b5371ab77bde39c64cf99e9aee054e3ba",
+      "sha256": "cedfdc10e4f739e3b2c887a5a5cbcf4532847d10e32ec6e4e07ff1277681eeb8",
       "source": "Classical Chinese poetry public-domain corpus curated for MVP",
       "license": "Public Domain"
     }
