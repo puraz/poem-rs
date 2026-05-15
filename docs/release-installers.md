@@ -2,6 +2,32 @@
 
 `poem-rs` uses platform-native installers in CI. The Windows path is intentionally opinionated because MSI quality depends more on install semantics than on simply producing an `.msi` file.
 
+## macOS DMG strategy
+
+The macOS installer is built as a `.app` bundle with `cargo-bundle`, then wrapped in a DMG with `create-dmg`.
+
+Important distribution rule:
+
+- A DMG downloaded from a browser is not a real end-user macOS installer unless the enclosed `.app` is signed with a `Developer ID Application` certificate and the final DMG is notarized by Apple.
+- If CI builds the DMG without those credentials, Gatekeeper may show messages like "已损坏，无法打开" on another Mac even when the binary itself runs locally on the build machine.
+
+### Optional macOS signing and notarization secrets
+
+If these repository secrets exist, the workflow signs the `.app`, signs the DMG, submits it to Apple notarization, and staples the ticket:
+
+- `MACOS_CERT_P12_BASE64`: base64-encoded Developer ID Application `.p12`
+- `MACOS_CERT_PASSWORD`: password for the `.p12`
+- `MACOS_SIGNING_IDENTITY`: full codesigning identity name, for example `Developer ID Application: Example, Inc. (TEAMID1234)`
+- `MACOS_NOTARY_APPLE_ID`: Apple ID used for notarization
+- `MACOS_NOTARY_APP_PASSWORD`: app-specific password for that Apple ID
+- `MACOS_NOTARY_TEAM_ID`: Apple Developer Team ID
+
+Behavior by configuration:
+
+- No macOS secrets: CI still builds an unsigned DMG for internal/local testing, but it is not suitable for normal browser download distribution.
+- Signing secrets only: CI signs the `.app` and DMG, but Gatekeeper may still reject downloads because notarization is missing.
+- Signing + notarization secrets: CI produces the DMG shape expected for regular macOS distribution.
+
 ## Windows MSI strategy
 
 The Windows installer is built with `cargo-wix` on top of WiX Toolset v3.
