@@ -57,7 +57,6 @@ pub fn run() -> Result<()> {
 }
 
 struct PoemApp {
-    paths: AppPaths,
     db: AppDatabase,
     ai_config: StoredAiConfig,
     state: AppState,
@@ -71,13 +70,12 @@ impl PoemApp {
         let ai_config = db.load_ai_config().expect("failed to load ai config");
         let poems = db.list_poems().expect("failed to load poems");
         let selected_poem_id = poems.first().map(|poem| poem.id.clone());
-        let settings_form = SettingsForm::from_stored(&paths, &ai_config);
+        let settings_form = SettingsForm::from_stored(&ai_config);
         let active_theme =
             ThemeChoice::from_saved(db.load_theme_preference().ok().flatten().as_deref());
         let state = AppState::new(poems, selected_poem_id, settings_form, active_theme);
 
         let mut app = Self {
-            paths,
             db,
             ai_config,
             state,
@@ -131,10 +129,8 @@ impl PoemApp {
                 self.state.close_theme_panel();
                 match modal {
                     Modal::Settings => {
-                        self.state.settings_form = SettingsForm::rehydrated(
-                            SettingsForm::from_stored(&self.paths, &self.ai_config),
-                            String::new(),
-                        );
+                        self.state.settings_form =
+                            SettingsForm::from_stored(&self.ai_config);
                         self.state.open_modal(Modal::Settings);
                     }
                     Modal::Edit => self.state.open_edit_for_selected(),
@@ -191,11 +187,10 @@ impl PoemApp {
                 self.state.discovery_status.clear();
                 self.state.discovery_results.clear();
                 self.state.active_modal = Modal::Discovery;
-                let paths = self.paths.clone();
                 let config = self.ai_config.clone();
                 let query = self.state.discovery_query.clone();
                 Task::perform(
-                    task::run_discovery_search(paths, config, query),
+                    task::run_discovery_search(config, query),
                     Message::DiscoveryLoaded,
                 )
             }
@@ -256,13 +251,8 @@ impl PoemApp {
                 self.state.settings_form.set_api_key_input(value);
                 Task::none()
             }
-            Message::SettingsFallbackChanged(value) => {
-                self.state.settings_form.allow_file_fallback = value;
-                Task::none()
-            }
             Message::SaveSettings => {
                 self.ai_config.settings = self.state.settings_form.to_settings();
-                self.ai_config.allow_file_fallback = self.state.settings_form.allow_file_fallback;
                 let api_key = self
                     .state
                     .settings_form
@@ -271,7 +261,6 @@ impl PoemApp {
                     .to_string();
                 Task::perform(
                     task::save_settings(
-                        self.paths.clone(),
                         self.db.clone(),
                         self.ai_config.clone(),
                         api_key,
@@ -281,34 +270,30 @@ impl PoemApp {
             }
             Message::SettingsSaved(result) => match result {
                 Ok(saved) => {
-                    self.state.settings_form = SettingsForm::rehydrated(
-                        SettingsForm::from_stored(&self.paths, &self.ai_config),
-                        saved.warning,
-                    );
+                    self.state.settings_form =
+                        SettingsForm::from_stored(&self.ai_config);
                     let revision = self.state.toast.show(saved.message);
                     dismiss_toast_later(revision)
                 }
                 Err(message) => {
-                    self.state.settings_form.warning = message;
-                    Task::none()
+                    let revision = self.state.toast.show(message);
+                    dismiss_toast_later(revision)
                 }
             },
             Message::ClearApiKey => Task::perform(
-                task::clear_api_key(self.paths.clone()),
+                task::clear_api_key(),
                 Message::ApiKeyCleared,
             ),
             Message::ApiKeyCleared(result) => match result {
                 Ok(saved) => {
-                    self.state.settings_form = SettingsForm::rehydrated(
-                        SettingsForm::from_stored(&self.paths, &self.ai_config),
-                        saved.warning,
-                    );
+                    self.state.settings_form =
+                        SettingsForm::from_stored(&self.ai_config);
                     let revision = self.state.toast.show(saved.message);
                     dismiss_toast_later(revision)
                 }
                 Err(message) => {
-                    self.state.settings_form.warning = message;
-                    Task::none()
+                    let revision = self.state.toast.show(message);
+                    dismiss_toast_later(revision)
                 }
             },
             Message::OpenEditModal => {
@@ -376,11 +361,10 @@ impl PoemApp {
                 };
                 self.state.loading_frame = 0;
                 self.state.appreciation.begin_loading(poem.id.clone());
-                let paths = self.paths.clone();
                 let db = self.db.clone();
                 let config = self.ai_config.clone();
                 Task::perform(
-                    task::generate_and_persist_appreciation(paths, db, config, poem),
+                    task::generate_and_persist_appreciation(db, config, poem),
                     Message::AppreciationLoaded,
                 )
             }
@@ -435,6 +419,41 @@ impl PoemApp {
                 self.state.toast.dismiss_if_current(revision);
                 Task::none()
             }
+            Message::ExportPoems => Task::perform(
+                task::export_all(self.db.clone()),
+                Message::ExportFinished,
+            ),
+            Message::ImportPoems => {
+                let db = self.db.clone();
+                Task::perform(task::import_all(db), Message::BulkImportFinished)
+            }
+            Message::ExportFinished(result) => match result {
+                Ok(filename) => {
+                    let revision = self.state.toast.show(format!("已导出到 {filename}"));
+                    dismiss_toast_later(revision)
+                }
+                Err(message) => {
+                    let revision = self.state.toast.show(message);
+                    dismiss_toast_later(revision)
+                }
+            },
+            Message::BulkImportFinished(result) => match result {
+                Ok(count) => {
+                    self.reload_poems();
+                    self.refresh_cached_appreciation();
+                    let msg = if count > 0 {
+                        format!("成功导入 {count} 首诗词")
+                    } else {
+                        "没有新诗词需要导入（已去重）".to_string()
+                    };
+                    let revision = self.state.toast.show(msg);
+                    dismiss_toast_later(revision)
+                }
+                Err(message) => {
+                    let revision = self.state.toast.show(message);
+                    dismiss_toast_later(revision)
+                }
+            },
         }
     }
 

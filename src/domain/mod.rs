@@ -54,6 +54,46 @@ impl PoemCandidate {
     }
 }
 
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ExportPoem {
+    pub title: String,
+    pub author: String,
+    pub dynasty: String,
+    pub content: String,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub source: String,
+    #[serde(default)]
+    pub license: String,
+    #[serde(default)]
+    pub is_favorite: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PoetryExport {
+    pub version: u32,
+    pub app: String,
+    pub exported_at: String,
+    pub total: usize,
+    pub poems: Vec<ExportPoem>,
+}
+
+impl From<&Poem> for ExportPoem {
+    fn from(poem: &Poem) -> Self {
+        Self {
+            title: poem.title.clone(),
+            author: poem.author.clone(),
+            dynasty: poem.dynasty.clone(),
+            content: poem.content.clone(),
+            tags: poem.tags.clone(),
+            source: poem.source.clone(),
+            license: poem.license.clone(),
+            is_favorite: poem.is_favorite,
+        }
+    }
+}
+
 impl From<&Poem> for PoemCandidate {
     fn from(value: &Poem) -> Self {
         Self::new(

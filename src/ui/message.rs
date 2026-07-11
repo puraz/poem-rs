@@ -80,7 +80,6 @@ pub enum Message {
     SettingsBaseUrlChanged(String),
     SettingsModelChanged(String),
     SettingsApiKeyChanged(String),
-    SettingsFallbackChanged(bool),
     SaveSettings,
     SettingsSaved(Result<SettingsSaveResult, String>),
     ClearApiKey,
@@ -102,6 +101,10 @@ pub enum Message {
     SystemThemeChanged(theme::Mode),
     DismissToast,
     ToastExpired(u64),
+    ExportPoems,
+    ImportPoems,
+    ExportFinished(Result<String, String>),
+    BulkImportFinished(Result<usize, String>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,7 +116,6 @@ pub struct ImportedPoem {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SettingsSaveResult {
     pub message: String,
-    pub warning: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -11,6 +11,7 @@ directories = "6.0.0"
 iced = { version = "0.14.0", features = ["image", "tokio", "svg"] }
 keyring = { version = "3.6.3", default-features = false, features = ["apple-native", "windows-native", "sync-secret-service"] }
 libc = "0.2.185"
+rfd = "0.15"
 reqwest = { version = "0.13.2", default-features = false, features = ["blocking", "json", "rustls"] }
 rusqlite = { version = "0.39.0", features = ["bundled"] }
 serde = { version = "1.0.228", features = ["derive"] }

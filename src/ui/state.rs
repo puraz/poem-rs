@@ -1,7 +1,4 @@
-use crate::config::ai::{
-    AiSettings, FILE_FALLBACK_WARNING, FileSecretStore, KeyringSecretStore, SecretPersistencePlan,
-};
-use crate::config::app::AppPaths;
+use crate::config::ai::{AiSettings, KeyringSecretStore, SecretPersistencePlan};
 use crate::domain::{DiscoveredPoem, Poem};
 use crate::storage::StoredAiConfig;
 use iced::{theme, widget::text_editor};
@@ -50,39 +47,24 @@ pub struct SettingsForm {
     pub model: String,
     pub api_key: String,
     pub api_key_masked: bool,
-    pub allow_file_fallback: bool,
     pub mode_label: String,
-    pub warning: String,
 }
 
 impl SettingsForm {
-    pub fn from_stored(paths: &AppPaths, config: &StoredAiConfig) -> Self {
-        let file_store = FileSecretStore::new(paths.config_dir());
-        let (secret, persistence) = current_secret(paths, config.allow_file_fallback);
-        let warning = if persistence == SecretPersistencePlan::WarnedFileFallback {
-            FILE_FALLBACK_WARNING.to_string()
-        } else {
-            String::new()
-        };
+    pub fn from_stored(config: &StoredAiConfig) -> Self {
+        let (secret, persistence) = current_secret();
         let has_saved_api_key = secret.is_some();
-        let api_key = if has_saved_api_key {
-            String::new()
-        } else {
-            file_store.load_api_key().ok().flatten().unwrap_or_default()
-        };
 
         Self {
             base_url: config.settings.base_url.clone(),
             model: config.settings.model.clone(),
-            api_key,
+            api_key: String::new(),
             api_key_masked: has_saved_api_key,
-            allow_file_fallback: config.allow_file_fallback,
             mode_label: config
                 .settings
                 .mode_for(secret.is_some(), persistence)
                 .label()
                 .to_string(),
-            warning,
         }
     }
 
@@ -100,11 +82,6 @@ impl SettingsForm {
             },
             timeout_secs: AiSettings::default().timeout_secs,
         }
-    }
-
-    pub fn rehydrated(mut persisted: Self, warning: impl Into<String>) -> Self {
-        persisted.warning = warning.into();
-        persisted
     }
 
     pub fn api_key_input_value(&self) -> &str {
@@ -425,30 +402,15 @@ impl AppState {
     }
 }
 
-pub fn current_secret(
-    paths: &AppPaths,
-    allow_file_fallback: bool,
-) -> (Option<String>, SecretPersistencePlan) {
+pub fn current_secret() -> (Option<String>, SecretPersistencePlan) {
     let keyring = KeyringSecretStore;
-    let file_store = FileSecretStore::new(paths.config_dir());
 
     if KeyringSecretStore::is_available() {
         if let Ok(Some(secret)) = keyring.load_api_key() {
             return (Some(secret), SecretPersistencePlan::Keyring);
         }
-        if allow_file_fallback && let Ok(Some(secret)) = file_store.load_api_key() {
-            return (Some(secret), SecretPersistencePlan::WarnedFileFallback);
-        }
 
         return (None, SecretPersistencePlan::Keyring);
-    }
-
-    if allow_file_fallback {
-        if let Ok(Some(secret)) = file_store.load_api_key() {
-            return (Some(secret), SecretPersistencePlan::WarnedFileFallback);
-        }
-
-        return (None, SecretPersistencePlan::WarnedFileFallback);
     }
 
     (None, SecretPersistencePlan::Unavailable)
@@ -609,9 +571,7 @@ mod tests {
             model: "".into(),
             api_key: String::new(),
             api_key_masked: false,
-            allow_file_fallback: false,
             mode_label: String::new(),
-            warning: String::new(),
         };
 
         let settings = form.to_settings();

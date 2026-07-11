@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::config::ai::AiSettings;
-use crate::domain::{AiAppreciation, DiscoveredPoem, Poem};
+use crate::domain::{AiAppreciation, DiscoveredPoem, ExportPoem, Poem, PoetryExport};
 
 const MANIFEST_JSON: &str = include_str!("../../assets/poetry/manifest.json");
 const CORPUS_JSON: &str = include_str!("../../assets/poetry/corpus.json");
@@ -21,7 +21,6 @@ pub struct AppDatabase {
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct StoredAiConfig {
     pub settings: AiSettings,
-    pub allow_file_fallback: bool,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -139,10 +138,6 @@ impl AppDatabase {
                     .unwrap_or(AiSettings::default().timeout_secs)
                     .max(AiSettings::default().timeout_secs),
             },
-            allow_file_fallback: values
-                .get("ai.allow_file_fallback")
-                .map(|v| v == "1")
-                .unwrap_or(false),
         })
     }
 
@@ -154,11 +149,6 @@ impl AppDatabase {
             &conn,
             "ai.timeout_secs",
             &config.settings.timeout_secs.to_string(),
-        )?;
-        self.set_meta(
-            &conn,
-            "ai.allow_file_fallback",
-            if config.allow_file_fallback { "1" } else { "0" },
         )?;
         Ok(())
     }
@@ -290,6 +280,83 @@ impl AppDatabase {
             poems: self.list_poems()?,
             favorites: self.list_favorites()?,
         })
+    }
+
+    pub fn export_all_as_json(&self) -> Result<String> {
+        let poems = self.list_poems()?;
+        let export_poems: Vec<ExportPoem> = poems.iter().map(|p| p.into()).collect();
+        let export = PoetryExport {
+            version: 1,
+            app: "poem-rs".to_string(),
+            exported_at: now_string(),
+            total: export_poems.len(),
+            poems: export_poems,
+        };
+        Ok(serde_json::to_string_pretty(&export)?)
+    }
+
+    pub fn import_from_json_str(&self, json_str: &str) -> Result<usize> {
+        let export: PoetryExport = serde_json::from_str(json_str)?;
+        let conn = self.connect()?;
+
+        let mut imported = 0usize;
+        for poem in &export.poems {
+            let checksum = checksum_hex(
+                format!(
+                    "{}\n{}\n{}",
+                    poem.title, poem.author, poem.content
+                )
+                .as_bytes(),
+            );
+
+            let exists: bool = conn
+                .query_row(
+                    "SELECT COUNT(1) FROM poems WHERE checksum = ?1",
+                    [&checksum],
+                    |row| row.get::<_, i64>(0),
+                )
+                .map(|count| count > 0)
+                .unwrap_or(false);
+
+            if exists {
+                continue;
+            }
+
+            let poem_id = import_poem_id(&poem.title, &poem.author, &poem.content);
+            conn.execute(
+                r#"
+                INSERT INTO poems(
+                    id, title, author, dynasty, content, tags_json, source, license, checksum,
+                    seed_version, created_at
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                "#,
+                params![
+                    poem_id.as_str(),
+                    poem.title.as_str(),
+                    poem.author.as_str(),
+                    poem.dynasty.as_str(),
+                    poem.content.as_str(),
+                    serde_json::to_string(&poem.tags)?,
+                    poem.source.as_str(),
+                    poem.license.as_str(),
+                    checksum,
+                    0_i64,
+                    now_string(),
+                ],
+            )?;
+
+            if poem.is_favorite {
+                conn.execute(
+                    "INSERT OR IGNORE INTO favorites(poem_id, created_at) VALUES (?1, ?2)",
+                    params![poem_id.as_str(), now_string()],
+                )?;
+            }
+
+            imported += 1;
+        }
+
+        Ok(imported)
     }
 
     fn connect(&self) -> Result<Connection> {
@@ -517,6 +584,17 @@ fn unique_import_id(poem: &DiscoveredPoem) -> String {
         .as_bytes(),
     );
     format!("ai::{nanos}::{}", &checksum[..12])
+}
+
+fn import_poem_id(title: &str, author: &str, content: &str) -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    let checksum = checksum_hex(
+        format!("{title}|{author}|{content}|{nanos}").as_bytes(),
+    );
+    format!("import::{nanos}::{}", &checksum[..12])
 }
 
 #[derive(Debug, Deserialize)]

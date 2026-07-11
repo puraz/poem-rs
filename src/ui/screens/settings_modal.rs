@@ -1,16 +1,16 @@
-use iced::widget::{Space, checkbox, column, container, row, scrollable, text};
+use iced::widget::{Space, column, container, row, scrollable, text};
 use iced::{Alignment, Color, Element, Length, Theme};
 
 use crate::ui::components::{
-    ButtonKind, compact_button, field_input, input_block, modal_frame, modal_header_with_close,
-    secure_field_input,
+    ButtonKind, SurfaceKind, compact_button, field_input, input_block, modal_frame,
+    modal_header_with_close, section_surface, secure_field_input,
 };
 use crate::ui::message::Message;
 use crate::ui::state::SettingsForm;
 use crate::ui::theme;
 
 pub fn view<'a>(form: &'a SettingsForm) -> Element<'a, Message> {
-    let mut content = column![
+    let ai_fields = column![
         status_row(form.mode_label.as_str()),
         input_block(
             "Base URL",
@@ -26,16 +26,18 @@ pub fn view<'a>(form: &'a SettingsForm) -> Element<'a, Message> {
             secure_field_input("输入 API Key", form.api_key_input_value())
                 .on_input(Message::SettingsApiKeyChanged),
         ),
-        fallback_section(form.allow_file_fallback),
     ]
     .spacing(20);
 
-    if !form.warning.trim().is_empty() {
-        content = content.push(warning_block(form.warning.as_str()));
-    }
+    let content = column![
+        section_surface("AI 配置", ai_fields, SurfaceKind::Raised),
+        Space::new().height(theme::SPACE_5 as f32),
+        data_section(),
+    ]
+    .spacing(0);
 
     modal_frame(
-        modal_header_with_close("AI 设置", Some(""), Message::CloseModal),
+        modal_header_with_close("设置", None, Message::CloseModal),
         scrollable(content)
             .direction(theme::scrollable_direction())
             .style(theme::scrollable_style)
@@ -78,41 +80,44 @@ fn status_row<'a>(mode_label: &'a str) -> Element<'a, Message> {
     .into()
 }
 
-fn fallback_section<'a>(allow_file_fallback: bool) -> Element<'a, Message> {
-    container(
-        column![
-            checkbox(allow_file_fallback)
-                .label("允许文件回退存储")
-                .size(20)
-                .text_size(16)
-                .spacing(10)
-                .on_toggle(Message::SettingsFallbackChanged),
-            row![
-                Space::new().width(Length::Fixed(34.0)),
-                container(text("当 API 调用失败时，将赏析结果回退存储到本地文件。").size(13))
-                    .style(theme::quiet_text),
-            ]
-            .align_y(Alignment::Center),
-        ]
-        .spacing(8),
-    )
-    .width(Length::Fill)
-    .into()
-}
-
-fn warning_block<'a>(warning: &'a str) -> Element<'a, Message> {
-    container(text(warning).size(13))
-        .padding([12, 14])
-        .width(Length::Fill)
-        .style(theme::outline_panel)
-        .into()
-}
-
 fn status_accent(mode_label: &str) -> Color {
     match mode_label {
         "已配置" => Color::from_rgb8(0x67, 0xB2, 0x79),
-        "回退存储" => Color::from_rgb8(0xC4, 0x8A, 0x4A),
         "未配置" | "不可用" => Color::from_rgb8(0xC4, 0x5A, 0x4A),
         _ => Color::from_rgb8(0x67, 0xB2, 0x79),
     }
+}
+
+fn data_section<'a>() -> Element<'a, Message> {
+    section_surface(
+        "数据管理",
+        column![
+            section_surface(
+                "备份与恢复",
+                column![
+                    container(
+                        text("导出全部诗词为 JSON 文件，以便备份或迁移到其他设备。导入时自动跳过重复内容。")
+                            .size(13)
+                    )
+                    .style(theme::quiet_text),
+                    Space::new().height(theme::SPACE_4 as f32),
+                    row![
+                        compact_button("导出全部诗词", ButtonKind::Secondary)
+                            .width(Length::Fill)
+                            .on_press(Message::ExportPoems),
+                        Space::new().width(theme::SPACE_3 as f32),
+                        compact_button("导入诗词", ButtonKind::Secondary)
+                            .width(Length::Fill)
+                            .on_press(Message::ImportPoems),
+                    ]
+                    .spacing(0)
+                    .align_y(Alignment::Center),
+                ]
+                .spacing(0),
+                SurfaceKind::Outline,
+            ),
+        ]
+        .spacing(0),
+        SurfaceKind::Raised,
+    )
 }

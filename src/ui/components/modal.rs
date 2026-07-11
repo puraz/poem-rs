@@ -11,8 +11,8 @@ pub fn modal_header<'a, Message: 'a>(
     subtitle: Option<&'a str>,
 ) -> Element<'a, Message> {
     let mut text_stack = widget::Column::new()
-        .spacing(f32::from(theme::SPACE_2))
-        .push(widget::text(title.into()).size(28));
+        .spacing(6)
+        .push(widget::text(title.into()).size(24));
 
     if let Some(subtitle) = subtitle {
         text_stack = text_stack
@@ -35,7 +35,7 @@ pub fn modal_header_with_close<'a, Message: Clone + 'a>(
         });
 
     widget::Row::new()
-        .align_y(iced::Alignment::Start)
+        .align_y(iced::Alignment::Center)
         .push(modal_header(title, subtitle))
         .push(widget::Space::new().width(Length::Fill))
         .push(
@@ -60,7 +60,7 @@ pub fn modal_frame<'a, Message: 'a>(
         .push(
             widget::container(header)
                 .width(Length::Fill)
-                .padding([theme::SPACE_6, theme::SPACE_6]),
+                .padding([theme::SPACE_5, theme::SPACE_6]),
         )
         .push(modal_divider())
         .push(

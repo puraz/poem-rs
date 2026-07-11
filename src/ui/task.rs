@@ -1,7 +1,6 @@
 use anyhow::{Result, anyhow};
 
-use crate::config::ai::{FileSecretStore, KeyringSecretStore};
-use crate::config::app::AppPaths;
+use crate::config::ai::KeyringSecretStore;
 use crate::domain::{AiAppreciation, DiscoveredPoem, Poem};
 use crate::services::ai::{
     HttpAiTransport, OpenAiCompatibleClient, build_appreciation_prompt, build_discovery_prompt,
@@ -14,11 +13,10 @@ use super::message::{
 use super::state::{EditForm, current_secret};
 
 pub async fn run_discovery_search(
-    paths: AppPaths,
     config: StoredAiConfig,
     query: String,
 ) -> Result<Vec<DiscoveredPoem>, String> {
-    let (secret, _) = current_secret(&paths, config.allow_file_fallback);
+    let (secret, _) = current_secret();
     let secret =
         secret.ok_or_else(|| "AI 未配置，请先在设置中填写可用模型与 API Key。".to_string())?;
     let prompt = build_discovery_prompt(&query);
@@ -44,11 +42,10 @@ pub async fn import_discovery_poem(
 }
 
 pub async fn request_appreciation(
-    paths: AppPaths,
     config: StoredAiConfig,
     poem: Poem,
 ) -> Result<AiAppreciation, String> {
-    let (secret, _) = current_secret(&paths, config.allow_file_fallback);
+    let (secret, _) = current_secret();
     let secret =
         secret.ok_or_else(|| "AI 未配置，请先在设置中填写可用模型与 API Key。".to_string())?;
     let client = OpenAiCompatibleClient::new(HttpAiTransport::new(config.settings, Some(secret)));
@@ -67,14 +64,13 @@ pub async fn request_appreciation(
 }
 
 pub async fn generate_and_persist_appreciation(
-    paths: AppPaths,
     db: AppDatabase,
     config: StoredAiConfig,
     poem: Poem,
 ) -> Result<AppreciationResult, AppreciationFailure> {
     let poem_id = poem.id.clone();
     let model = config.settings.model.clone();
-    let appreciation = request_appreciation(paths, config, poem)
+    let appreciation = request_appreciation(config, poem)
         .await
         .map_err(|message| AppreciationFailure {
             poem_id: poem_id.clone(),
@@ -110,7 +106,6 @@ pub async fn save_edited_poem(db: AppDatabase, form: EditForm) -> Result<EditedP
 }
 
 pub async fn save_settings(
-    paths: AppPaths,
     db: AppDatabase,
     config: StoredAiConfig,
     api_key: String,
@@ -119,56 +114,77 @@ pub async fn save_settings(
         .map_err(|err| format!("保存设置失败: {err}"))?;
 
     if !api_key.trim().is_empty() {
-        store_secret(&paths, &config, api_key.trim())
+        store_secret(api_key.trim())
             .map_err(|err| format!("保存 API Key 失败: {err}"))?;
     }
 
-    let (_, persistence) = current_secret(&paths, config.allow_file_fallback);
-    let warning = if matches!(
-        persistence,
-        crate::config::ai::SecretPersistencePlan::WarnedFileFallback
-    ) {
-        crate::config::ai::FILE_FALLBACK_WARNING.to_string()
-    } else {
-        String::new()
-    };
-
     Ok(SettingsSaveResult {
         message: "设置已保存".to_string(),
-        warning,
     })
 }
 
-pub async fn clear_api_key(paths: AppPaths) -> Result<SettingsSaveResult, String> {
+pub async fn clear_api_key() -> Result<SettingsSaveResult, String> {
     let keyring = KeyringSecretStore;
-    let file_store = FileSecretStore::new(paths.config_dir());
     keyring
         .clear()
-        .map_err(|err| format!("清除 keyring 中的 API Key 失败: {err}"))?;
-    file_store
-        .clear()
-        .map_err(|err| format!("清除本地回退 API Key 失败: {err}"))?;
+        .map_err(|err| format!("清除 API Key 失败: {err}"))?;
 
     Ok(SettingsSaveResult {
         message: "API Key 已清除".to_string(),
-        warning: String::new(),
     })
 }
 
-fn store_secret(paths: &AppPaths, config: &StoredAiConfig, api_key: &str) -> Result<()> {
+fn store_secret(api_key: &str) -> Result<()> {
     let keyring = KeyringSecretStore;
-    let file_store = FileSecretStore::new(paths.config_dir());
 
     if KeyringSecretStore::is_available() {
         keyring.save_api_key(api_key)?;
-        let _ = file_store.clear();
         return Ok(());
     }
 
-    if config.allow_file_fallback {
-        file_store.save_api_key(api_key)?;
-        return Ok(());
-    }
+    Err(anyhow!("系统钥匙串不可用，无法保存 API Key"))
+}
 
-    Err(anyhow!("{}", crate::config::ai::FILE_FALLBACK_WARNING))
+pub async fn export_all(db: AppDatabase) -> Result<String, String> {
+    let json = db
+        .export_all_as_json()
+        .map_err(|err| format!("导出失败: {err}"))?;
+
+    let path = std::thread::spawn(|| {
+        rfd::FileDialog::new()
+            .set_title("导出诗词")
+            .set_file_name("poems-backup.json")
+            .add_filter("JSON", &["json"])
+            .save_file()
+    })
+    .join()
+    .map_err(|_| "文件对话框错误".to_string())?
+    .ok_or_else(|| "已取消导出".to_string())?;
+
+    std::fs::write(&path, &json).map_err(|err| format!("写入文件失败: {err}"))?;
+
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("poems-backup.json")
+        .to_string();
+    Ok(name)
+}
+
+pub async fn import_all(db: AppDatabase) -> Result<usize, String> {
+    let path = std::thread::spawn(|| {
+        rfd::FileDialog::new()
+            .set_title("导入诗词")
+            .add_filter("JSON", &["json"])
+            .pick_file()
+    })
+    .join()
+    .map_err(|_| "文件对话框错误".to_string())?
+    .ok_or_else(|| "已取消导入".to_string())?;
+
+    let json = std::fs::read_to_string(&path)
+        .map_err(|err| format!("读取文件失败: {err}"))?;
+
+    db.import_from_json_str(&json)
+        .map_err(|err| format!("导入失败: {err}"))
 }
