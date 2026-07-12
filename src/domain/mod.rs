@@ -199,3 +199,72 @@ impl AiAppreciation {
         parts.join("\n\n")
     }
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PoetProfile {
+    pub poet_name: String,
+    pub content: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+/// Strip common Markdown markers from text for plain-text display.
+pub fn strip_markdown(text: &str) -> String {
+    let mut result = String::with_capacity(text.len());
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+
+        // Skip horizontal rules
+        if trimmed == "---" || trimmed == "***" || trimmed == "___" {
+            continue;
+        }
+
+        let mut cleaned = trimmed;
+
+        // Remove heading markers
+        if cleaned.starts_with('#') {
+            cleaned = cleaned.trim_start_matches(['#', ' ']);
+        }
+
+        // Remove blockquote prefix
+        if cleaned.starts_with('>') {
+            cleaned = cleaned.trim_start_matches("> ").trim_start_matches('>');
+        }
+
+        // Remove unordered list markers
+        if cleaned.starts_with("- ") || cleaned.starts_with("* ") || cleaned.starts_with("+ ") {
+            cleaned = &cleaned[2..];
+        }
+
+        // Remove bold/italic markers and inline code backticks
+        let cleaned = cleaned
+            .replace("**", "")
+            .replace("__", "")
+            .replace(['*', '`'], "")
+            .replace(['[', ']'], "");
+
+        // Handle markdown links: [text](url) → remove (url) part
+        let cleaned = if let Some(open) = cleaned.find('(') {
+            if cleaned.contains(')') {
+                let before = &cleaned[..open];
+                let after = &cleaned[cleaned.rfind(')').unwrap() + 1..];
+                format!("{}{}", before, after)
+            } else {
+                cleaned
+            }
+        } else {
+            cleaned
+        };
+
+        // Remove image markers
+        let cleaned = cleaned.replace("![", "[");
+
+        if !cleaned.trim().is_empty() {
+            result.push_str(cleaned.trim());
+            result.push('\n');
+        }
+    }
+
+    result.trim().to_string()
+}

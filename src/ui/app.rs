@@ -9,6 +9,7 @@ use iced::{
 use tracing_subscriber::EnvFilter;
 
 use crate::config::app::AppPaths;
+use crate::domain::{strip_markdown, Poem};
 use crate::storage::{AppDatabase, StoredAiConfig};
 
 use super::components::{
@@ -17,7 +18,7 @@ use super::components::{
 };
 use super::assets;
 use super::message::{ContentMode, DetailTool, Message, Modal, ThemeChoice};
-use super::screens::{about_modal, discovery_modal, edit_modal, library, settings_modal};
+use super::screens::{about_modal, discovery_modal, edit_modal, library, poet_page, settings_modal};
 use super::state::{AppState, SettingsForm};
 use super::task;
 use super::theme;
@@ -60,6 +61,7 @@ struct PoemApp {
     db: AppDatabase,
     ai_config: StoredAiConfig,
     state: AppState,
+    poets: Vec<String>,
 }
 
 impl PoemApp {
@@ -79,8 +81,10 @@ impl PoemApp {
             db,
             ai_config,
             state,
+            poets: Vec::new(),
         };
         app.refresh_cached_appreciation();
+        app.rebuild_poets_list();
 
         (app, system::theme().map(Message::SystemThemeChanged))
     }
@@ -122,6 +126,11 @@ impl PoemApp {
                     mode
                 };
                 self.state.switch_content_mode(next_mode);
+                // Reset poet page / filter state when switching away from poet page
+                if next_mode != ContentMode::PoetPage {
+                    self.state.poet_page_poet = None;
+                    self.state.poet_filter = String::new();
+                }
                 self.refresh_cached_appreciation();
                 Task::none()
             }
@@ -393,6 +402,62 @@ impl PoemApp {
                 self.state.advance_loading_frame();
                 Task::none()
             }
+            Message::PoetNameClicked(poet_name) => {
+                self.state.content_mode = ContentMode::PoetPage;
+                self.state.poet_page_poet = Some(poet_name.clone());
+                self.state.poet_filter = String::new();
+                self.state.selected_poem_id = None;
+
+                // Try to load cached profile first
+                match self.db.load_poet_profile(&poet_name) {
+                    Ok(Some(profile)) => {
+                        self.state
+                            .poet_profile_map
+                            .insert(poet_name.clone(), profile.content);
+                    }
+                    _ => {
+                        // No cached profile — will be fetched via refresh button
+                    }
+                }
+                Task::none()
+            }
+            Message::PoetFilterChanged(poet_name) => {
+                self.state.poet_filter = poet_name;
+                self.state.sync_selection();
+                self.refresh_cached_appreciation();
+                Task::none()
+            }
+            Message::RefreshPoetProfile(poet_name) => {
+                self.state.poet_loading = true;
+                self.state.poet_loading_name = Some(poet_name.clone());
+                let db = self.db.clone();
+                let config = self.ai_config.clone();
+                Task::perform(
+                    task::generate_and_cache_poet_profile(db, config, poet_name),
+                    Message::PoetProfileLoaded,
+                )
+            }
+            Message::PoetProfileLoaded(result) => {
+                self.state.poet_loading = false;
+                self.state.poet_loading_name = None;
+                match result {
+                    Ok(payload) => {
+                        let stripped = strip_markdown(&payload.content);
+                        self.state
+                            .poet_profile_map
+                            .insert(payload.poet_name.clone(), stripped);
+                        let revision = self.state.toast.show(format!(
+                            "已获取「{}」的诗人档案",
+                            payload.poet_name
+                        ));
+                        dismiss_toast_later(revision)
+                    }
+                    Err(message) => {
+                        let revision = self.state.toast.show(message);
+                        dismiss_toast_later(revision)
+                    }
+                }
+            }
             Message::ToggleThemePanel => {
                 self.state.toggle_theme_panel();
                 Task::none()
@@ -614,18 +679,46 @@ impl PoemApp {
     }
 
     fn middle_pane(&self) -> Element<'_, Message> {
-        let title = if self.state.content_mode == ContentMode::Favorites {
-            "我的收藏"
-        } else {
-            "诗词列表"
-        };
+        match self.state.content_mode {
+            ContentMode::PoetPage => {
+                let poet_name = self.state.poet_page_poet.as_deref().unwrap_or("");
+                let profile = self.state.poet_profile_map.get(poet_name).map(|s| s.as_str());
+                let is_loading = self.state.poet_loading;
 
-        library::view(
-            self.state.visible_poems(),
-            self.state.selected_poem_id.as_deref(),
-            &self.state.search_query,
-            title,
-        )
+                // Filter poems by the current poet for the poet page
+                let poet_poems: Vec<Poem> = self
+                    .state
+                    .poems
+                    .iter()
+                    .filter(|p| p.author == poet_name)
+                    .cloned()
+                    .collect();
+
+                poet_page::view(
+                    poet_name,
+                    profile,
+                    is_loading,
+                    poet_poems,
+                    self.state.selected_poem_id.as_deref(),
+                )
+            }
+            _ => {
+                let title = if self.state.content_mode == ContentMode::Favorites {
+                    "我的收藏"
+                } else {
+                    "诗词列表"
+                };
+
+                library::view(
+                    self.state.visible_poems(),
+                    self.state.selected_poem_id.as_deref(),
+                    &self.state.search_query,
+                    title,
+                    &self.state.poet_filter,
+                    &self.poets,
+                )
+            }
+        }
     }
 
     fn detail_pane(&self) -> Element<'_, Message> {
@@ -770,6 +863,24 @@ impl PoemApp {
     fn reload_poems(&mut self) {
         self.state.poems = self.db.list_poems().unwrap_or_default();
         self.state.sync_selection();
+        self.rebuild_poets_list();
+    }
+
+    fn rebuild_poets_list(&mut self) {
+        let mut poets: Vec<String> = self
+            .state
+            .poems
+            .iter()
+            .map(|p| p.author.clone())
+            .fold(Vec::new(), |mut acc, author| {
+                if !acc.contains(&author) && !author.is_empty() {
+                    acc.push(author);
+                }
+                acc
+            });
+        poets.sort();
+        poets.insert(0, "全部诗人".to_string());
+        self.poets = poets;
     }
 
     fn refresh_cached_appreciation(&mut self) {

@@ -1,4 +1,4 @@
-use iced::widget::{button, column, container, row, scrollable, svg, text, text_input};
+use iced::widget::{button, column, container, pick_list, row, scrollable, svg, text, text_input};
 use iced::{Alignment, Element, Fill, Length, Theme};
 
 use crate::domain::Poem;
@@ -14,6 +14,8 @@ pub fn view<'a>(
     selected_poem_id: Option<&str>,
     search_query: &'a str,
     title: &'a str,
+    poet_filter: &'a str,
+    poets: &'a [String],
 ) -> Element<'a, Message> {
     let search = container(
         row![
@@ -37,12 +39,44 @@ pub fn view<'a>(
     .width(Length::Fill)
     .style(theme::library_search_shell);
 
+    let poet_filter_dropdown = {
+        let options: Vec<String> = poets.to_vec();
+        let selected: Option<&String> = if poet_filter.is_empty() || poet_filter == "全部诗人" {
+            poets.first()
+        } else {
+            poets.iter().find(|s| s.as_str() == poet_filter)
+        };
+
+        container(
+            row![
+                text("按诗人：").size(14),
+                pick_list(
+                    options,
+                    selected,
+                    |selected| {
+                        let filter = if selected == "全部诗人" {
+                            String::new()
+                        } else {
+                            selected.to_string()
+                        };
+                        Message::PoetFilterChanged(filter)
+                    },
+                )
+                .padding([4, 8])
+                .text_size(14),
+            ]
+            .spacing(8)
+            .align_y(Alignment::Center),
+        )
+        .padding([0, LIBRARY_SEARCH_PADDING[0]])
+        .width(Length::Fill)
+    };
+
     let list = poems
         .into_iter()
         .fold(column![].spacing(13), |column, poem| {
             let selected = selected_poem_id == Some(poem.id.as_str());
             let title = poem.title.clone();
-            let meta = poem.metadata();
             let snippet = poem.snippet();
             let is_favorite = poem.is_favorite;
 
@@ -55,13 +89,13 @@ pub fn view<'a>(
                     ]
                     .align_y(Alignment::Center),
                     column![
-                        container(text(meta).size(14)).style(move |active_theme| {
-                            if selected {
-                                theme::library_item_meta_selected(active_theme)
-                            } else {
-                                theme::subdued_text(active_theme)
-                            }
-                        }),
+                        {
+                            let poet_name = poem.author.clone();
+                            let poet_dynasty = poem.dynasty.clone();
+                            button(text(format!("{} · {}", poet_name, poet_dynasty)).size(14))
+                                .style(button::text)
+                                .on_press(Message::PoetNameClicked(poet_name))
+                        },
                         container(text(snippet).size(15)).style(move |active_theme| {
                             if selected {
                                 theme::library_item_snippet_selected(active_theme)
@@ -97,6 +131,7 @@ pub fn view<'a>(
         column![
             container(text(title).size(14)).style(theme::title_text),
             search,
+            poet_filter_dropdown,
             scrollable(list)
                 .direction(theme::scrollable_direction())
                 .style(theme::scrollable_style)

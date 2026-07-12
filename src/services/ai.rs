@@ -22,6 +22,19 @@ pub struct AppreciationPrompt {
     pub excerpt: String,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PoetProfilePrompt {
+    pub poet_name: String,
+    pub dynasty: String,
+    pub poem_titles: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PoetProfilePayload {
+    pub poet_name: String,
+    pub content: String,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct RecommendationPayload {
     pub recommendations: Vec<AiRecommendation>,
@@ -59,6 +72,10 @@ pub trait AiTransport {
         &self,
         request: &AppreciationPrompt,
     ) -> Result<AiAppreciation, AiTransportError>;
+    async fn fetch_poet_profile(
+        &self,
+        request: &PoetProfilePrompt,
+    ) -> Result<PoetProfilePayload, AiTransportError>;
 }
 
 #[derive(Clone, Debug)]
@@ -95,6 +112,13 @@ where
         request: &AppreciationPrompt,
     ) -> Result<AiAppreciation, AiTransportError> {
         self.transport.appreciate(request).await
+    }
+
+    pub async fn fetch_poet_profile(
+        &self,
+        request: &PoetProfilePrompt,
+    ) -> Result<PoetProfilePayload, AiTransportError> {
+        self.transport.fetch_poet_profile(request).await
     }
 }
 
@@ -224,6 +248,33 @@ impl AiTransport for HttpAiTransport {
         );
         let content = self.post_chat(system_prompt, &user_prompt).await?;
         parse_appreciation_content(&content)
+    }
+
+    async fn fetch_poet_profile(
+        &self,
+        request: &PoetProfilePrompt,
+    ) -> Result<PoetProfilePayload, AiTransportError> {
+        let system_prompt = r#"你是一个中国古典文学专家。用户会提供一位诗人的名字以及该诗人的部分作品列表。
+请为这位诗人生成一份详细的文学传记档案。
+
+要求：
+1. 内容应包括：生平简介、字号/别称、生卒年份、籍贯、文学风格、代表作品点评、历史地位与影响
+2. 返回纯文本，不要使用 Markdown 格式（不要用 # * - ` > 等标记符号）
+3. 内容应当详尽丰富，有实质信息而非泛泛而谈
+4. 不要使用 "描述"、"以下是"、"关于" 等引导性语言开头，直接开始正文
+5. 只返回文本内容，不要任何 JSON 包裹、不要代码块包裹"#;
+
+        let poem_titles = request.poem_titles.join("、");
+        let user_prompt = format!(
+            "诗人：{}\n朝代：{}\n代表作品：{}\n\n请为这位诗人生成详细档案。",
+            request.poet_name, request.dynasty, poem_titles
+        );
+
+        let content = self.post_chat(system_prompt, &user_prompt).await?;
+        Ok(PoetProfilePayload {
+            poet_name: request.poet_name.clone(),
+            content,
+        })
     }
 }
 
@@ -411,6 +462,18 @@ pub fn build_appreciation_prompt(
     }
 }
 
+pub fn build_poet_profile_prompt(
+    poet_name: &str,
+    dynasty: &str,
+    poem_titles: Vec<String>,
+) -> PoetProfilePrompt {
+    PoetProfilePrompt {
+        poet_name: poet_name.to_string(),
+        dynasty: dynasty.to_string(),
+        poem_titles,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -421,6 +484,7 @@ mod tests {
         discovery: Result<DiscoveryPayload, AiTransportError>,
         recommendation: Result<RecommendationPayload, AiTransportError>,
         appreciation: Result<AiAppreciation, AiTransportError>,
+        poet_profile: Result<PoetProfilePayload, AiTransportError>,
     }
 
     impl AiTransport for StubTransport {
@@ -443,6 +507,13 @@ mod tests {
             _request: &AppreciationPrompt,
         ) -> Result<AiAppreciation, AiTransportError> {
             self.appreciation.clone()
+        }
+
+        async fn fetch_poet_profile(
+            &self,
+            _request: &PoetProfilePrompt,
+        ) -> Result<PoetProfilePayload, AiTransportError> {
+            self.poet_profile.clone()
         }
     }
 
@@ -480,6 +551,7 @@ mod tests {
                 vec!["花".into()],
                 "- imagery",
             )),
+            poet_profile: Err(AiTransportError::Unconfigured),
         });
 
         let discovered = block_on(client.discover(&DiscoveryPrompt {
@@ -518,6 +590,7 @@ mod tests {
             discovery: Err(AiTransportError::Timeout),
             recommendation: Err(AiTransportError::Timeout),
             appreciation: Err(AiTransportError::Unconfigured),
+            poet_profile: Err(AiTransportError::Unconfigured),
         });
 
         assert_eq!(

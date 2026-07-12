@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::config::ai::AiSettings;
-use crate::domain::{AiAppreciation, DiscoveredPoem, ExportPoem, Poem, PoetryExport};
+use crate::domain::{AiAppreciation, DiscoveredPoem, ExportPoem, Poem, PoetProfile, PoetryExport};
 
 const MANIFEST_JSON: &str = include_str!("../../assets/poetry/manifest.json");
 const CORPUS_JSON: &str = include_str!("../../assets/poetry/corpus.json");
@@ -359,6 +359,48 @@ impl AppDatabase {
         Ok(imported)
     }
 
+    pub fn save_poet_profile(&self, poet_name: &str, content: &str) -> Result<()> {
+        let conn = self.connect()?;
+        let now = now_string();
+        conn.execute(
+            r#"
+            INSERT INTO poet_profiles(poet_name, content, created_at, updated_at)
+            VALUES (?1, ?2, ?3, ?4)
+            ON CONFLICT(poet_name) DO UPDATE SET
+                content = excluded.content,
+                updated_at = excluded.updated_at
+            "#,
+            params![poet_name, content, now, now],
+        )?;
+        Ok(())
+    }
+
+    pub fn load_poet_profile(&self, poet_name: &str) -> Result<Option<PoetProfile>> {
+        let conn = self.connect()?;
+        let mut stmt = conn.prepare(
+            "SELECT poet_name, content, created_at, updated_at FROM poet_profiles WHERE poet_name = ?1",
+        )?;
+        Ok(stmt
+            .query_row([poet_name], |row| {
+                Ok(PoetProfile {
+                    poet_name: row.get(0)?,
+                    content: row.get(1)?,
+                    created_at: row.get(2)?,
+                    updated_at: row.get(3)?,
+                })
+            })
+            .optional()?)
+    }
+
+    pub fn list_distinct_authors(&self) -> Result<Vec<String>> {
+        let conn = self.connect()?;
+        let mut stmt = conn.prepare(
+            "SELECT DISTINCT author FROM poems WHERE author != '' ORDER BY author",
+        )?;
+        let rows = stmt.query_map([], |row| row.get::<_, String>(0))?;
+        Ok(rows.collect::<rusqlite::Result<Vec<_>>>()?)
+    }
+
     fn connect(&self) -> Result<Connection> {
         if let Some(parent) = self.path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -395,6 +437,12 @@ impl AppDatabase {
                 poem_id TEXT PRIMARY KEY REFERENCES poems(id) ON DELETE CASCADE,
                 analysis_markdown TEXT NOT NULL,
                 model TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS poet_profiles (
+                poet_name TEXT PRIMARY KEY,
+                content TEXT NOT NULL,
+                created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             );
             "#,

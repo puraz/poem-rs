@@ -4,11 +4,13 @@ use crate::config::ai::KeyringSecretStore;
 use crate::domain::{AiAppreciation, DiscoveredPoem, Poem};
 use crate::services::ai::{
     HttpAiTransport, OpenAiCompatibleClient, build_appreciation_prompt, build_discovery_prompt,
+    build_poet_profile_prompt,
 };
 use crate::storage::{AppDatabase, StoredAiConfig};
 
 use super::message::{
-    AppreciationFailure, AppreciationResult, EditedPoem, ImportedPoem, SettingsSaveResult,
+    AppreciationFailure, AppreciationResult, EditedPoem, ImportedPoem, PoetProfileLoadedPayload,
+    SettingsSaveResult,
 };
 use super::state::{EditForm, current_secret};
 
@@ -87,6 +89,50 @@ pub async fn generate_and_persist_appreciation(
         poem_id,
         content: appreciation.display_text(),
     })
+}
+
+pub async fn fetch_poet_profile(
+    config: StoredAiConfig,
+    poet_name: String,
+    db: AppDatabase,
+) -> Result<PoetProfileLoadedPayload, String> {
+    let (secret, _) = current_secret();
+    let secret =
+        secret.ok_or_else(|| "AI 未配置，请先在设置中填写可用模型与 API Key。".to_string())?;
+
+    // Get poet's dynasty and poem titles from the database
+    let poems = db.list_poems().map_err(|e| format!("读取诗库失败: {e}"))?;
+    let poet_poems: Vec<&Poem> = poems.iter().filter(|p| p.author == poet_name).collect();
+    let dynasty = poet_poems
+        .first()
+        .map(|p| p.dynasty.as_str())
+        .unwrap_or("未知");
+    let poem_titles: Vec<String> = poet_poems.iter().map(|p| p.title.clone()).collect();
+
+    let client = OpenAiCompatibleClient::new(HttpAiTransport::new(config.settings, Some(secret)));
+    let prompt = build_poet_profile_prompt(&poet_name, dynasty, poem_titles);
+    let payload = client
+        .fetch_poet_profile(&prompt)
+        .await
+        .map_err(|err| format!("AI 获取诗人档案失败: {err:?}"))?;
+
+    Ok(PoetProfileLoadedPayload {
+        poet_name: payload.poet_name,
+        content: payload.content,
+    })
+}
+
+pub async fn generate_and_cache_poet_profile(
+    db: AppDatabase,
+    config: StoredAiConfig,
+    poet_name: String,
+) -> Result<PoetProfileLoadedPayload, String> {
+    let payload = fetch_poet_profile(config, poet_name.clone(), db.clone()).await?;
+
+    db.save_poet_profile(&payload.poet_name, &payload.content)
+        .map_err(|e| format!("保存诗人档案失败: {e}"))?;
+
+    Ok(payload)
 }
 
 pub async fn save_edited_poem(db: AppDatabase, form: EditForm) -> Result<EditedPoem, String> {

@@ -14,6 +14,7 @@ pub enum Modal {
 pub enum ContentMode {
     Library,
     Favorites,
+    PoetPage,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -105,6 +106,10 @@ pub enum Message {
     ImportPoems,
     ExportFinished(Result<String, String>),
     BulkImportFinished(Result<usize, String>),
+    PoetNameClicked(String),
+    PoetFilterChanged(String),
+    RefreshPoetProfile(String),
+    PoetProfileLoaded(Result<PoetProfileLoadedPayload, String>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -134,6 +139,12 @@ pub struct AppreciationResult {
 pub struct AppreciationFailure {
     pub poem_id: String,
     pub message: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PoetProfileLoadedPayload {
+    pub poet_name: String,
+    pub content: String,
 }
 
 #[cfg(test)]

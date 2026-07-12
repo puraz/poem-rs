@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::config::ai::{AiSettings, KeyringSecretStore, SecretPersistencePlan};
 use crate::domain::{DiscoveredPoem, Poem};
 use crate::storage::StoredAiConfig;
@@ -277,6 +279,11 @@ pub struct AppState {
     pub edit_form: Option<EditForm>,
     pub hovered_detail_tool: Option<DetailTool>,
     pub loading_frame: usize,
+    pub poet_profile_map: HashMap<String, String>,
+    pub poet_filter: String,
+    pub poet_loading: bool,
+    pub poet_loading_name: Option<String>,
+    pub poet_page_poet: Option<String>,
 }
 
 impl AppState {
@@ -305,11 +312,16 @@ impl AppState {
             edit_form: None,
             hovered_detail_tool: None,
             loading_frame: 0,
+            poet_profile_map: HashMap::new(),
+            poet_filter: String::new(),
+            poet_loading: false,
+            poet_loading_name: None,
+            poet_page_poet: None,
         }
     }
 
     pub fn is_loading_animation_active(&self) -> bool {
-        self.discovery_loading || self.appreciation.loading
+        self.discovery_loading || self.appreciation.loading || self.poet_loading
     }
 
     pub fn advance_loading_frame(&mut self) {
@@ -325,9 +337,19 @@ impl AppState {
                 .filter(|poem| poem.is_favorite)
                 .cloned()
                 .collect(),
+            ContentMode::PoetPage => self.poems.clone(),
         };
 
-        filter_poems(&mode_poems, &self.search_query)
+        let filtered = if self.poet_filter.is_empty() || self.poet_filter == "全部诗人" {
+            mode_poems
+        } else {
+            mode_poems
+                .into_iter()
+                .filter(|poem| poem.author == self.poet_filter)
+                .collect()
+        };
+
+        filter_poems(&filtered, &self.search_query)
     }
 
     pub fn selected_poem(&self) -> Option<Poem> {
