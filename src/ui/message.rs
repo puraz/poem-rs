@@ -29,6 +29,7 @@ pub enum DetailTool {
     Favorite,
     Edit,
     Appreciation,
+    Delete,
 }
 
 impl ThemeChoice {
@@ -95,6 +96,8 @@ pub enum Message {
     EditSaved(Result<EditedPoem, String>),
     RequestAppreciation,
     AppreciationLoaded(Result<AppreciationResult, AppreciationFailure>),
+    DeletePoem,
+    PoemDeleted(Result<String, String>),
     LoadingTick,
     ToggleThemePanel,
     CloseThemePanel,

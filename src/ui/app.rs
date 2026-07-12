@@ -178,6 +178,30 @@ impl PoemApp {
                     }
                 }
             }
+            Message::DeletePoem => {
+                let Some(poem_id) = self.state.selected_poem_id.clone() else {
+                    return Task::none();
+                };
+                Task::perform(
+                    task::delete_poem(self.db.clone(), poem_id),
+                    Message::PoemDeleted,
+                )
+            }
+            Message::PoemDeleted(result) => {
+                match result {
+                    Ok(_poem_id) => {
+                        self.reload_poems();
+                        self.state.sync_selection();
+                        self.refresh_cached_appreciation();
+                        let revision = self.state.toast.show("诗词已删除");
+                        dismiss_toast_later(revision)
+                    }
+                    Err(err) => {
+                        let revision = self.state.toast.show(err);
+                        dismiss_toast_later(revision)
+                    }
+                }
+            }
             Message::DiscoveryQueryChanged(query) => {
                 self.state.discovery_query = query;
                 Task::none()
@@ -784,6 +808,13 @@ impl PoemApp {
                 false,
                 DetailTool::Appreciation,
                 (!self.state.appreciation.loading).then_some(Message::RequestAppreciation),
+            ),
+            detail_icon_action(
+                assets::TRASH,
+                SidebarIconTone::Default,
+                false,
+                DetailTool::Delete,
+                Some(Message::DeletePoem),
             ),
         ]
         .spacing(12)

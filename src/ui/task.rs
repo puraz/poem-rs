@@ -43,6 +43,12 @@ pub async fn import_discovery_poem(
         .map_err(|err| format!("导入失败: {err}"))
 }
 
+pub async fn delete_poem(db: AppDatabase, poem_id: String) -> Result<String, String> {
+    db.delete_poem(&poem_id)
+        .map(|_| poem_id)
+        .map_err(|err| format!("删除失败: {err}"))
+}
+
 pub async fn request_appreciation(
     config: StoredAiConfig,
     poem: Poem,

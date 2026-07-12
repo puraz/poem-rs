@@ -240,7 +240,6 @@ impl AppDatabase {
 
     pub fn insert_imported_poem(&self, poem: &DiscoveredPoem) -> Result<String> {
         let conn = self.connect()?;
-        let poem_id = unique_import_id(poem);
         let checksum = checksum_hex(
             format!(
                 "{}\n{}\n{}\n{}",
@@ -248,6 +247,21 @@ impl AppDatabase {
             )
             .as_bytes(),
         );
+
+        let exists: bool = conn
+            .query_row(
+                "SELECT COUNT(1) FROM poems WHERE checksum = ?1",
+                [&checksum],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|count| count > 0)
+            .unwrap_or(false);
+
+        if exists {
+            anyhow::bail!("诗词已存在，跳过导入");
+        }
+
+        let poem_id = unique_import_id(poem);
 
         conn.execute(
             r#"
@@ -273,6 +287,12 @@ impl AppDatabase {
         )?;
 
         Ok(poem_id)
+    }
+
+    pub fn delete_poem(&self, poem_id: &str) -> Result<()> {
+        let conn = self.connect()?;
+        conn.execute("DELETE FROM poems WHERE id = ?1", params![poem_id])?;
+        Ok(())
     }
 
     pub fn poetry_snapshot(&self) -> Result<PoetrySnapshot> {
@@ -837,8 +857,8 @@ mod tests {
     }
 
     #[test]
-    fn imported_poems_allow_duplicate_content_with_new_ids() {
-        let path = temp_db_path("import-duplicates");
+    fn imported_poems_reject_duplicate_content() {
+        let path = temp_db_path("import-dedup");
         let db = AppDatabase::new(&path);
         db.bootstrap().expect("bootstrap");
 
@@ -855,9 +875,12 @@ mod tests {
         };
 
         let first_id = db.insert_imported_poem(&poem).expect("first import");
-        let second_id = db.insert_imported_poem(&poem).expect("second import");
-
-        assert_ne!(first_id, second_id);
+        let second = db.insert_imported_poem(&poem);
+        assert!(second.is_err(), "duplicate import should be rejected");
+        assert!(
+            second.unwrap_err().to_string().contains("诗词已存在"),
+            "error should mention duplicate"
+        );
 
         let imported = db
             .list_poems()
@@ -865,9 +888,8 @@ mod tests {
             .into_iter()
             .filter(|item| item.title == poem.title && item.author == poem.author)
             .collect::<Vec<_>>();
-        assert!(imported.len() >= 2);
-        assert!(imported.iter().any(|item| item.id == first_id));
-        assert!(imported.iter().any(|item| item.id == second_id));
+        assert_eq!(imported.len(), 1);
+        assert_eq!(imported[0].id, first_id);
         let _ = std::fs::remove_file(path);
     }
 
@@ -877,7 +899,7 @@ mod tests {
         let db = AppDatabase::new(&path);
         db.bootstrap().expect("bootstrap");
 
-        let poem = DiscoveredPoem {
+        let poem_a = DiscoveredPoem {
             title: "新作".into(),
             content: "第一版".into(),
             author: "测试作者".into(),
@@ -888,9 +910,20 @@ mod tests {
             match_reason: "测试".into(),
             is_recommendation: true,
         };
+        let poem_b = DiscoveredPoem {
+            title: "新作".into(),
+            content: "第二版".into(),
+            author: "测试作者".into(),
+            dynasty: "今".into(),
+            category: String::new(),
+            notes: String::new(),
+            relevance_score: 0.9,
+            match_reason: "测试".into(),
+            is_recommendation: true,
+        };
 
-        let first_id = db.insert_imported_poem(&poem).expect("first import");
-        let second_id = db.insert_imported_poem(&poem).expect("second import");
+        let first_id = db.insert_imported_poem(&poem_a).expect("first import");
+        let second_id = db.insert_imported_poem(&poem_b).expect("second import");
 
         let poems = db.list_poems().expect("list poems");
         assert_eq!(
