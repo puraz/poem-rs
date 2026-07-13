@@ -46,8 +46,8 @@ pub fn run() -> Result<()> {
         .subscription(PoemApp::subscription)
         .theme(PoemApp::theme)
         .window(window::Settings {
-            size: Size::new(1200.0, 800.0),
-            min_size: Some(Size::new(1200.0, 800.0)),
+            size: Size::new(1024.0, 680.0),
+            min_size: Some(Size::new(1024.0, 680.0)),
             position: window::Position::Centered,
             icon: Some(window_icon),
             ..Default::default()
