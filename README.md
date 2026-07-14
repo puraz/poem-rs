@@ -101,9 +101,72 @@ cargo test
 cargo run
 ```
 
-## 安装包发布
+## 下载与安装
 
-跨平台安装包发布流程见：
+安装包通过 [GitHub Releases](https://github.com/puraz/poem-rs-xus/releases) 发布，从最新 Release 的 **Assets** 区域下载对应平台的安装文件。
 
-- `docs/release-installers.md`
-- `.github/workflows/release-installers.yml`
+### macOS
+
+**安装包：** `poem-rs-{{ 版本号 }}-macos.dmg`
+
+**安装步骤：**
+
+1. 下载 `.dmg` 文件并双击挂载
+2. 将 `poem-rs.app` 拖入 `应用程序` 文件夹
+3. 首次打开时，macOS Gatekeeper 可能会提示**“已损坏，无法打开”**或**“无法验证开发者”**，这是因为安装包尚未进行 Apple 签名与公证。请按以下任一方式绕过：
+
+   **方式一：终端命令（推荐）**
+
+   ```bash
+   sudo xattr -rd com.apple.quarantine /Applications/poem-rs.app
+   ```
+
+   **方式二：系统设置**
+
+   - 打开 **系统设置 → 隐私与安全性**
+   - 滚动到下方 **安全性** 区域，点击 **“仍要打开”**
+   - 在弹出的确认对话框中点击 **“打开”**
+
+> 如果上述选项未出现，可先尝试方式一。未来配置 Apple 开发者证书并启用公证后，将不再需要此步骤。
+
+### Windows
+
+**安装包：** `poem-rs-{{ 版本号 }}-x86_64.msi`
+
+**安装步骤：**
+
+1. 下载 `.msi` 文件并双击运行
+2. 按安装向导完成安装
+3. 安装完成后在开始菜单中找到 `poem-rs` 启动
+
+### Linux
+
+提供两种格式：
+
+| 格式 | 文件 | 适用发行版 |
+|------|------|-----------|
+| **AppImage** | `poem-rs-{{ 版本号 }}-x86_64.AppImage` | 所有主流发行版（通用） |
+| **DEB** | `poem-rs_{{ 版本号 }}-1_amd64.deb` | Debian / Ubuntu 及衍生版 |
+
+**AppImage 安装：**
+
+```bash
+chmod +x poem-rs-*-x86_64.AppImage
+./poem-rs-*-x86_64.AppImage
+```
+
+可将其移动到任意目录（如 `~/Applications`）或创建桌面快捷方式。
+
+**DEB 安装：**
+
+```bash
+sudo dpkg -i poem-rs_*-1_amd64.deb
+# 如遇依赖缺失：
+sudo apt-get install -f
+```
+
+安装后可在应用菜单中启动 `poem-rs`。
+
+### 从源码构建
+
+如需自行编译，请参考上方 [快速开始](#快速开始) 章节。

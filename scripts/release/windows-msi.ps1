@@ -97,13 +97,6 @@ function Sign-MsiIfConfigured([string]$msiPath) {
   }
 }
 
-function Write-Checksum([string]$artifactPath) {
-  $hash = Get-FileHash -Path $artifactPath -Algorithm SHA256
-  $checksumPath = "$artifactPath.sha256"
-  "$($hash.Hash.ToLowerInvariant())  $([System.IO.Path]::GetFileName($artifactPath))" | Set-Content -Path $checksumPath -NoNewline
-  Write-Host "Checksum written to $checksumPath"
-}
-
 $repoRoot = Get-RepoRoot
 Set-Location $repoRoot
 
@@ -149,6 +142,5 @@ if (-not $msi) {
 }
 
 Sign-MsiIfConfigured -msiPath $msi.FullName
-Write-Checksum -artifactPath $msi.FullName
 
 Write-Host "Built artifact: $($msi.FullName)"
